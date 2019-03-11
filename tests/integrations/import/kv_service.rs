@@ -9,7 +9,6 @@ use uuid::Uuid;
 
 use grpcio::{ChannelBuilder, Environment, Result, WriteFlags};
 use kvproto::import_kvpb::*;
-use kvproto::import_kvpb_grpc::*;
 
 use tikv::config::TiKvConfig;
 use tikv::import::ImportKVServer;
@@ -42,21 +41,21 @@ fn test_kv_service() {
     server.start();
 
     let uuid = Uuid::new_v4().as_bytes().to_vec();
-    let mut head = WriteHead::new();
+    let mut head = WriteHead::default();
     head.set_uuid(uuid.clone());
 
-    let mut m = Mutation::new();
-    m.op = Mutation_OP::Put;
+    let mut m = Mutation::default();
+    m.set_op(mutation::Op::Put);
     m.set_key(vec![1]);
     m.set_value(vec![1]);
-    let mut batch = WriteBatch::new();
+    let mut batch = WriteBatch::default();
     batch.set_commit_ts(123);
     batch.mut_mutations().push(m);
 
-    let mut open = OpenEngineRequest::new();
+    let mut open = OpenEngineRequest::default();
     open.set_uuid(uuid.clone());
 
-    let mut close = CloseEngineRequest::new();
+    let mut close = CloseEngineRequest::default();
     close.set_uuid(uuid.clone());
 
     // Write an engine before it is opened.
@@ -84,11 +83,11 @@ fn send_write(
     head: &WriteHead,
     batch: &WriteBatch,
 ) -> Result<WriteEngineResponse> {
-    let mut r1 = WriteEngineRequest::new();
+    let mut r1 = WriteEngineRequest::default();
     r1.set_head(head.clone());
-    let mut r2 = WriteEngineRequest::new();
+    let mut r2 = WriteEngineRequest::default();
     r2.set_batch(batch.clone());
-    let mut r3 = WriteEngineRequest::new();
+    let mut r3 = WriteEngineRequest::default();
     r3.set_batch(batch.clone());
     let reqs: Vec<_> = vec![r1, r2, r3]
         .into_iter()
@@ -100,7 +99,7 @@ fn send_write(
 }
 
 fn send_write_head(client: &ImportKvClient, head: &WriteHead) -> Result<WriteEngineResponse> {
-    let mut req = WriteEngineRequest::new();
+    let mut req = WriteEngineRequest::default();
     req.set_head(head.clone());
     let (tx, rx) = client.write_engine().unwrap();
     let stream = stream::once(Ok((req, WriteFlags::default())));

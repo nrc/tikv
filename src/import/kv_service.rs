@@ -7,7 +7,6 @@ use futures::{Future, Stream};
 use futures_cpupool::{Builder, CpuPool};
 use grpcio::{ClientStreamingSink, RequestStream, RpcContext, UnarySink};
 use kvproto::import_kvpb::*;
-use kvproto::import_kvpb_grpc::*;
 use uuid::Uuid;
 
 use crate::raftstore::store::keys;
@@ -88,7 +87,7 @@ impl ImportKv for ImportKVService {
                         }
                     }
                 })
-                .map(|_| SwitchModeResponse::new())
+                .map(|_| SwitchModeResponse::default())
                 .then(move |res| send_rpc_response!(res, sink, label, timer)),
         )
     }
@@ -109,7 +108,7 @@ impl ImportKv for ImportKVService {
                     let uuid = Uuid::from_bytes(req.get_uuid())?;
                     import.open_engine(uuid)
                 })
-                .map(|_| OpenEngineResponse::new())
+                .map(|_| OpenEngineResponse::default())
                 .then(move |res| send_rpc_response!(res, sink, label, timer)),
         )
     }
@@ -156,9 +155,9 @@ impl ImportKv for ImportKVService {
                         })
                     })
                     .then(move |res| match res {
-                        Ok(_) => Ok(WriteEngineResponse::new()),
+                        Ok(_) => Ok(WriteEngineResponse::default()),
                         Err(Error::EngineNotFound(v)) => {
-                            let mut resp = WriteEngineResponse::new();
+                            let mut resp = WriteEngineResponse::default();
                             resp.mut_error()
                                 .mut_engine_not_found()
                                 .set_uuid(v.as_bytes().to_vec());
@@ -188,9 +187,9 @@ impl ImportKv for ImportKVService {
                     import.close_engine(uuid)
                 })
                 .then(move |res| match res {
-                    Ok(_) => Ok(CloseEngineResponse::new()),
+                    Ok(_) => Ok(CloseEngineResponse::default()),
                     Err(Error::EngineNotFound(v)) => {
-                        let mut resp = CloseEngineResponse::new();
+                        let mut resp = CloseEngineResponse::default();
                         resp.mut_error()
                             .mut_engine_not_found()
                             .set_uuid(v.as_bytes().to_vec());
@@ -218,7 +217,7 @@ impl ImportKv for ImportKVService {
                     let uuid = Uuid::from_bytes(req.get_uuid())?;
                     import.import_engine(uuid, req.get_pd_addr())
                 })
-                .map(|_| ImportEngineResponse::new())
+                .map(|_| ImportEngineResponse::default())
                 .then(move |res| send_rpc_response!(res, sink, label, timer)),
         )
     }
@@ -239,7 +238,7 @@ impl ImportKv for ImportKVService {
                     let uuid = Uuid::from_bytes(req.get_uuid())?;
                     import.cleanup_engine(uuid)
                 })
-                .map(|_| CleanupEngineResponse::new())
+                .map(|_| CleanupEngineResponse::default())
                 .then(move |res| send_rpc_response!(res, sink, label, timer)),
         )
     }
@@ -284,7 +283,7 @@ impl ImportKv for ImportKVService {
                         }
                     }
                 })
-                .map(|_| CompactClusterResponse::new())
+                .map(|_| CompactClusterResponse::default())
                 .then(move |res| send_rpc_response!(res, sink, label, timer)),
         )
     }

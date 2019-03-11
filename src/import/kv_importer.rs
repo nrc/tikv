@@ -359,7 +359,7 @@ mod tests {
         assert!(importer.bind_engine(uuid).is_err());
         importer.open_engine(uuid).unwrap();
         let engine = importer.bind_engine(uuid).unwrap();
-        engine.write(WriteBatch::new()).unwrap();
+        engine.write(WriteBatch::default()).unwrap();
         // Can not close an in use engine.
         assert!(importer.close_engine(uuid).is_err());
         drop(engine);

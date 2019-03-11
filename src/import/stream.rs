@@ -15,7 +15,7 @@ use super::engine::*;
 use super::{Config, Error, Result};
 
 pub struct SSTFile {
-    pub meta: SSTMeta,
+    pub meta: SstMeta,
     pub(crate) info: LazySSTInfo,
 }
 
@@ -219,7 +219,7 @@ mod tests {
     }
 
     fn new_int_range(start: Option<i32>, end: Option<i32>) -> Range {
-        let mut range = Range::new();
+        let mut range = Range::default();
         if let Some(start) = start {
             let k = format!("k-{:04}", start);
             range.set_start(k.as_bytes().to_owned());

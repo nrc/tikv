@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 
 use cop_datatype::{EvalType, FieldTypeAccessor};
 use tikv_util::codec::number;
-use tipb::expression::{Expr, ExprType, FieldType};
+use tipb::{Expr, ExprType, FieldType};
 
 use super::super::function::RpnFnMeta;
 use super::expr::{RpnExpression, RpnExpressionNode};
@@ -24,7 +24,9 @@ impl RpnExpressionBuilder {
         // TODO: This logic relies on the correctness of the passed in GROUP BY eval type. However
         // it can be different from the one we calculated (e.g. pass a column / fn with different
         // type).
-        box_try!(EvalType::try_from(c.get_field_type().tp()));
+        box_try!(EvalType::try_from(FieldTypeAccessor::tp(
+            c.get_field_type()
+        )));
 
         match c.get_tp() {
             ExprType::ScalarFunc => {
@@ -96,7 +98,7 @@ impl RpnExpressionBuilder {
         max_columns: usize,
     ) -> Result<RpnExpression>
     where
-        F: Fn(tipb::expression::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
+        F: Fn(tipb::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
     {
         let mut expr_nodes = Vec::new();
         append_rpn_nodes_recursively(
@@ -246,7 +248,7 @@ fn append_rpn_nodes_recursively<F>(
     // the full schema instead.
 ) -> Result<()>
 where
-    F: Fn(tipb::expression::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
+    F: Fn(tipb::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
 {
     // TODO: We should check whether node types match the function signature. Otherwise there
     // will be panics when the expression is evaluated.
@@ -291,11 +293,11 @@ fn handle_node_fn_call<F>(
     max_columns: usize,
 ) -> Result<()>
 where
-    F: Fn(tipb::expression::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
+    F: Fn(tipb::ScalarFuncSig, &[Expr]) -> Result<RpnFnMeta> + Copy,
 {
     // Map pb func to `RpnFnMeta`.
     let func = fn_mapper(tree_node.get_sig(), tree_node.get_children())?;
-    let args = tree_node.take_children().into_vec();
+    let args = tree_node.take_children();
 
     // Only Int/Real/Duration/Decimal/Bytes/Json will be decoded
     let datums = datum::decode(&mut tree_node.get_val())?;
@@ -339,7 +341,9 @@ fn handle_node_constant(
     rpn_nodes: &mut Vec<RpnExpressionNode>,
     time_zone: &Tz,
 ) -> Result<()> {
-    let eval_type = box_try!(EvalType::try_from(tree_node.get_field_type().tp()));
+    let eval_type = box_try!(EvalType::try_from(FieldTypeAccessor::tp(
+        tree_node.get_field_type()
+    )));
 
     let scalar_value = match tree_node.get_tp() {
         ExprType::Null => get_scalar_value_null(eval_type),
@@ -428,8 +432,13 @@ fn extract_scalar_value_date_time(
     let v = number::decode_u64(&mut val.as_slice())
         .map_err(|_| Error::Other(box_err!("Unable to decode date time from the request")))?;
     let fsp = field_type.decimal() as i8;
-    let value = DateTime::from_packed_u64(v, field_type.tp().try_into()?, fsp, time_zone)
-        .map_err(|_| Error::Other(box_err!("Unable to decode date time from the request")))?;
+    let value = DateTime::from_packed_u64(
+        v,
+        FieldTypeAccessor::tp(field_type).try_into()?,
+        fsp,
+        time_zone,
+    )
+    .map_err(|_| Error::Other(box_err!("Unable to decode date time from the request")))?;
     Ok(ScalarValue::DateTime(Some(value)))
 }
 
@@ -462,7 +471,7 @@ mod tests {
 
     use cop_codegen::rpn_fn;
     use cop_datatype::FieldTypeTp;
-    use tipb::expression::ScalarFuncSig;
+    use tipb::ScalarFuncSig;
     use tipb_helper::ExprDefBuilder;
 
     use crate::coprocessor::codec::datum::{self, Datum};
@@ -530,7 +539,7 @@ mod tests {
 
         let node_fn_a_1 = {
             // node b
-            let mut node_b = Expr::new();
+            let mut node_b = Expr::default();
             node_b.set_tp(ExprType::Int64);
             node_b
                 .mut_field_type()
@@ -539,7 +548,7 @@ mod tests {
             node_b.mut_val().encode_i64(7).unwrap();
 
             // node c
-            let mut node_c = Expr::new();
+            let mut node_c = Expr::default();
             node_c.set_tp(ExprType::Int64);
             node_c
                 .mut_field_type()
@@ -548,7 +557,7 @@ mod tests {
             node_c.mut_val().encode_i64(3).unwrap();
 
             // node d
-            let mut node_d = Expr::new();
+            let mut node_d = Expr::default();
             node_d.set_tp(ExprType::Int64);
             node_d
                 .mut_field_type()
@@ -557,7 +566,7 @@ mod tests {
             node_d.mut_val().encode_i64(11).unwrap();
 
             // fn_c
-            let mut node_fn_c = Expr::new();
+            let mut node_fn_c = Expr::default();
             node_fn_c.set_tp(ExprType::ScalarFunc);
             node_fn_c.set_sig(ScalarFuncSig::CastIntAsString);
             node_fn_c
@@ -569,7 +578,7 @@ mod tests {
             node_fn_c.mut_children().push(node_d);
 
             // fn_a
-            let mut node_fn_a = Expr::new();
+            let mut node_fn_a = Expr::default();
             node_fn_a.set_tp(ExprType::ScalarFunc);
             node_fn_a.set_sig(ScalarFuncSig::CastIntAsInt);
             node_fn_a
@@ -582,7 +591,7 @@ mod tests {
 
         let node_fn_a_2 = {
             // node e
-            let mut node_e = Expr::new();
+            let mut node_e = Expr::default();
             node_e.set_tp(ExprType::Float64);
             node_e
                 .mut_field_type()
@@ -591,7 +600,7 @@ mod tests {
             node_e.mut_val().encode_f64(-1.5).unwrap();
 
             // node f
-            let mut node_f = Expr::new();
+            let mut node_f = Expr::default();
             node_f.set_tp(ExprType::Float64);
             node_f
                 .mut_field_type()
@@ -600,7 +609,7 @@ mod tests {
             node_f.mut_val().encode_f64(100.12).unwrap();
 
             // fn_b
-            let mut node_fn_b = Expr::new();
+            let mut node_fn_b = Expr::default();
             node_fn_b.set_tp(ExprType::ScalarFunc);
             node_fn_b.set_sig(ScalarFuncSig::CastIntAsReal);
             node_fn_b
@@ -611,7 +620,7 @@ mod tests {
             node_fn_b.mut_children().push(node_f);
 
             // fn_a
-            let mut node_fn_a = Expr::new();
+            let mut node_fn_a = Expr::default();
             node_fn_a.set_tp(ExprType::ScalarFunc);
             node_fn_a.set_sig(ScalarFuncSig::CastIntAsInt);
             node_fn_a
@@ -623,7 +632,7 @@ mod tests {
         };
 
         // node a (NULL)
-        let mut node_a = Expr::new();
+        let mut node_a = Expr::default();
         node_a.set_tp(ExprType::Null);
         node_a
             .mut_field_type()
@@ -631,7 +640,7 @@ mod tests {
             .set_tp(FieldTypeTp::Double);
 
         // fn_d
-        let mut node_fn_d = Expr::new();
+        let mut node_fn_d = Expr::default();
         node_fn_d.set_tp(ExprType::ScalarFunc);
         node_fn_d.set_sig(ScalarFuncSig::CastIntAsDecimal);
         node_fn_d
@@ -737,7 +746,7 @@ mod tests {
         let mut vec = vec![];
 
         // Col offset = 0. The minimum success max_columns is 1.
-        let mut node = Expr::new();
+        let mut node = Expr::default();
         node.set_tp(ExprType::ColumnRef);
         node.mut_val().encode_i64(0).unwrap();
         assert!(
@@ -751,7 +760,7 @@ mod tests {
         }
 
         // Col offset = 3. The minimum success max_columns is 4.
-        let mut node = Expr::new();
+        let mut node = Expr::default();
         node.set_tp(ExprType::ColumnRef);
         node.mut_val().encode_i64(3).unwrap();
         for i in 0..=3 {
@@ -768,26 +777,26 @@ mod tests {
         }
 
         // Col offset = 1, 2, 5. The minimum success max_columns is 6.
-        let mut node = Expr::new();
+        let mut node = Expr::default();
         node.set_tp(ExprType::ScalarFunc);
         node.set_sig(ScalarFuncSig::CastIntAsString); // fn_c
         node.mut_field_type()
             .as_mut_accessor()
             .set_tp(FieldTypeTp::LongLong);
         node.mut_children().push({
-            let mut n = Expr::new();
+            let mut n = Expr::default();
             n.set_tp(ExprType::ColumnRef);
             n.mut_val().encode_i64(1).unwrap();
             n
         });
         node.mut_children().push({
-            let mut n = Expr::new();
+            let mut n = Expr::default();
             n.set_tp(ExprType::ColumnRef);
             n.mut_val().encode_i64(2).unwrap();
             n
         });
         node.mut_children().push({
-            let mut n = Expr::new();
+            let mut n = Expr::default();
             n.set_tp(ExprType::ColumnRef);
             n.mut_val().encode_i64(5).unwrap();
             n

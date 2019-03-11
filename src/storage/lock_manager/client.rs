@@ -6,8 +6,7 @@ use futures::future;
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Future, Sink, Stream};
 use grpcio::{ChannelBuilder, EnvBuilder, WriteFlags};
-use kvproto::deadlock::*;
-use kvproto::deadlock_grpc::DeadlockClient;
+use kvproto::deadlockpb::*;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -46,7 +45,7 @@ impl Client {
     pub fn get_wait_for_entries(&self) -> DeadlockFuture<WaitForEntriesResponse> {
         match self
             .client
-            .get_wait_for_entries_async(&WaitForEntriesRequest::new())
+            .get_wait_for_entries_async(&WaitForEntriesRequest::default())
         {
             Ok(f) => Box::new(f.map_err(Error::Grpc)),
             Err(e) => Box::new(future::err(Error::Grpc(e))),

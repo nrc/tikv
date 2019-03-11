@@ -654,7 +654,7 @@ pub struct DbConfig {
     pub writable_file_max_buffer_size: ReadableSize,
     pub use_direct_io_for_flush_and_compaction: bool,
     pub enable_pipelined_write: bool,
-    pub defaultcf: DefaultCfConfig,
+    pub new_cf: DefaultCfConfig,
     pub writecf: WriteCfConfig,
     pub lockcf: LockCfConfig,
     pub raftcf: RaftCfConfig,
@@ -689,7 +689,7 @@ impl Default for DbConfig {
             writable_file_max_buffer_size: ReadableSize::mb(1),
             use_direct_io_for_flush_and_compaction: false,
             enable_pipelined_write: true,
-            defaultcf: DefaultCfConfig::default(),
+            new_cf: DefaultCfConfig::default(),
             writecf: WriteCfConfig::default(),
             lockcf: LockCfConfig::default(),
             raftcf: RaftCfConfig::default(),
@@ -754,7 +754,7 @@ impl DbConfig {
 
     pub fn build_cf_opts(&self, cache: &Option<Cache>) -> Vec<CFOptions<'_>> {
         vec![
-            CFOptions::new(CF_DEFAULT, self.defaultcf.build_opt(cache)),
+            CFOptions::new(CF_DEFAULT, self.new_cf.build_opt(cache)),
             CFOptions::new(CF_LOCK, self.lockcf.build_opt(cache)),
             CFOptions::new(CF_WRITE, self.writecf.build_opt(cache)),
             // TODO: rmeove CF_RAFT.
@@ -764,7 +764,7 @@ impl DbConfig {
 
     pub fn build_cf_opts_v2(&self, cache: &Option<Cache>) -> Vec<CFOptions<'_>> {
         vec![
-            CFOptions::new(CF_DEFAULT, self.defaultcf.build_opt(cache)),
+            CFOptions::new(CF_DEFAULT, self.new_cf.build_opt(cache)),
             CFOptions::new(CF_LOCK, self.lockcf.build_opt(cache)),
             CFOptions::new(CF_WRITE, self.writecf.build_opt(cache)),
             CFOptions::new(CF_RAFT, self.raftcf.build_opt(cache)),
@@ -772,7 +772,7 @@ impl DbConfig {
     }
 
     fn validate(&mut self) -> Result<(), Box<dyn Error>> {
-        self.defaultcf.validate()?;
+        self.new_cf.validate()?;
         self.lockcf.validate()?;
         self.writecf.validate()?;
         self.raftcf.validate()?;
@@ -781,7 +781,7 @@ impl DbConfig {
     }
 
     fn write_into_metrics(&self) {
-        write_into_metrics!(self.defaultcf, CF_DEFAULT, CONFIG_ROCKSDB_GAUGE);
+        write_into_metrics!(self.new_cf, CF_DEFAULT, CONFIG_ROCKSDB_GAUGE);
         write_into_metrics!(self.lockcf, CF_LOCK, CONFIG_ROCKSDB_GAUGE);
         write_into_metrics!(self.writecf, CF_WRITE, CONFIG_ROCKSDB_GAUGE);
         write_into_metrics!(self.raftcf, CF_RAFT, CONFIG_ROCKSDB_GAUGE);
@@ -880,7 +880,7 @@ pub struct RaftDbConfig {
     pub allow_concurrent_memtable_write: bool,
     pub bytes_per_sync: ReadableSize,
     pub wal_bytes_per_sync: ReadableSize,
-    pub defaultcf: RaftDefaultCfConfig,
+    pub new_cf: RaftDefaultCfConfig,
 }
 
 impl Default for RaftDbConfig {
@@ -909,7 +909,7 @@ impl Default for RaftDbConfig {
             allow_concurrent_memtable_write: false,
             bytes_per_sync: ReadableSize::mb(1),
             wal_bytes_per_sync: ReadableSize::kb(512),
-            defaultcf: RaftDefaultCfConfig::default(),
+            new_cf: RaftDefaultCfConfig::default(),
         }
     }
 }
@@ -959,11 +959,11 @@ impl RaftDbConfig {
     }
 
     pub fn build_cf_opts(&self, cache: &Option<Cache>) -> Vec<CFOptions<'_>> {
-        vec![CFOptions::new(CF_DEFAULT, self.defaultcf.build_opt(cache))]
+        vec![CFOptions::new(CF_DEFAULT, self.new_cf.build_opt(cache))]
     }
 
     fn validate(&mut self) -> Result<(), Box<dyn Error>> {
-        self.defaultcf.validate()?;
+        self.new_cf.validate()?;
         Ok(())
     }
 }
@@ -1384,10 +1384,10 @@ impl TiKvConfig {
         let cache_cfg = &mut self.storage.block_cache;
         if cache_cfg.shared && cache_cfg.capacity.is_none() {
             cache_cfg.capacity = Some(ReadableSize {
-                0: self.rocksdb.defaultcf.block_cache_size.0
+                0: self.rocksdb.new_cf.block_cache_size.0
                     + self.rocksdb.writecf.block_cache_size.0
                     + self.rocksdb.lockcf.block_cache_size.0
-                    + self.raftdb.defaultcf.block_cache_size.0,
+                    + self.raftdb.new_cf.block_cache_size.0,
             });
         }
     }
@@ -1591,17 +1591,17 @@ mod tests {
     fn test_block_size() {
         let mut tikv_cfg = TiKvConfig::default();
         tikv_cfg.pd.endpoints = vec!["".to_owned()];
-        tikv_cfg.rocksdb.defaultcf.block_size = ReadableSize::gb(10);
+        tikv_cfg.rocksdb.new_cf.block_size = ReadableSize::gb(10);
         tikv_cfg.rocksdb.lockcf.block_size = ReadableSize::gb(10);
         tikv_cfg.rocksdb.writecf.block_size = ReadableSize::gb(10);
         tikv_cfg.rocksdb.raftcf.block_size = ReadableSize::gb(10);
-        tikv_cfg.raftdb.defaultcf.block_size = ReadableSize::gb(10);
+        tikv_cfg.raftdb.new_cf.block_size = ReadableSize::gb(10);
         assert!(tikv_cfg.validate().is_err());
-        tikv_cfg.rocksdb.defaultcf.block_size = ReadableSize::kb(10);
+        tikv_cfg.rocksdb.new_cf.block_size = ReadableSize::kb(10);
         tikv_cfg.rocksdb.lockcf.block_size = ReadableSize::kb(10);
         tikv_cfg.rocksdb.writecf.block_size = ReadableSize::kb(10);
         tikv_cfg.rocksdb.raftcf.block_size = ReadableSize::kb(10);
-        tikv_cfg.raftdb.defaultcf.block_size = ReadableSize::kb(10);
+        tikv_cfg.raftdb.new_cf.block_size = ReadableSize::kb(10);
         tikv_cfg.validate().unwrap();
     }
 

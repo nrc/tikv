@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use tipb::expression::FieldType;
+use tipb::FieldType;
 
 use super::expr::{RpnExpression, RpnExpressionNode};
 use super::RpnFnCallPayload;
@@ -287,7 +287,7 @@ mod tests {
 
     use cop_codegen::rpn_fn;
     use cop_datatype::{EvalType, FieldTypeAccessor, FieldTypeTp};
-    use tipb::expression::FieldType;
+    use tipb::FieldType;
 
     use crate::coprocessor::codec::batch::LazyBatchColumn;
     use crate::coprocessor::codec::data_type::{Int, Real};
@@ -309,7 +309,7 @@ mod tests {
         let val = result.unwrap();
         assert!(val.is_scalar());
         assert_eq!(*val.scalar_value().unwrap().as_real(), Real::new(1.5).ok());
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(FieldTypeAccessor::tp(val.field_type()), FieldTypeTp::Double);
     }
 
     /// Creates fixture to be used in `test_eval_single_column_node_xxx`.
@@ -359,7 +359,10 @@ mod tests {
             val.vector_value().unwrap().logical_rows(),
             logical_rows.as_slice()
         );
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(
+            FieldTypeAccessor::tp(val.field_type()),
+            FieldTypeTp::LongLong
+        );
 
         let mut c = columns.clone();
         let exp = RpnExpressionBuilder::new().push_column_ref(1).build();
@@ -373,7 +376,7 @@ mod tests {
             [Some(1), Some(5), None, None, Some(42)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[2, 0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
 
         let mut c = columns.clone();
         let exp = RpnExpressionBuilder::new().push_column_ref(0).build();
@@ -389,7 +392,7 @@ mod tests {
             val.vector_value().unwrap().logical_rows(),
             logical_rows.as_slice()
         );
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Single column node but row numbers in `eval()` does not match column length, should panic.
@@ -437,7 +440,7 @@ mod tests {
             [Some(42), Some(42), Some(42), Some(42)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2, 3]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
     }
 
     /// Unary function (argument is scalar)
@@ -467,7 +470,7 @@ mod tests {
             ]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Unary function (argument is vector)
@@ -501,7 +504,7 @@ mod tests {
             [None, Some(6)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
     }
 
     /// Unary function (argument is raw column). The column should be decoded.
@@ -545,7 +548,10 @@ mod tests {
             [Some(8), Some(0), Some(-2)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(
+            FieldTypeAccessor::tp(val.field_type()),
+            FieldTypeTp::LongLong
+        );
     }
 
     /// Binary function (arguments are scalar, scalar)
@@ -576,7 +582,7 @@ mod tests {
             ]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Binary function (arguments are vector, scalar)
@@ -614,7 +620,7 @@ mod tests {
             ]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Binary function (arguments are scalar, vector)
@@ -652,7 +658,7 @@ mod tests {
             ]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Binary function (arguments are vector, vector)
@@ -703,7 +709,10 @@ mod tests {
             ]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(
+            FieldTypeAccessor::tp(val.field_type()),
+            FieldTypeTp::LongLong
+        );
     }
 
     /// Binary function (arguments are both raw columns). The same column is referred multiple times
@@ -749,7 +758,7 @@ mod tests {
             [Some(49)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
     }
 
     /// Ternary function (arguments are vector, scalar, vector)
@@ -785,7 +794,7 @@ mod tests {
             [Some(-10), Some(-2), Some(8)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1, 2]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
     }
 
     // Comprehensive expression:
@@ -874,7 +883,7 @@ mod tests {
             [Real::new(146.0).ok(), Real::new(25.0).ok(),]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::Double);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::Double as i32);
     }
 
     /// Unary function, but supplied zero arguments. Should panic.
@@ -945,8 +954,8 @@ mod tests {
     /// Parse from an expression tree then evaluate.
     #[test]
     fn test_parse_and_eval() {
-        use tipb::expression::ScalarFuncSig;
-        use tipb::expression::{Expr, ExprType};
+        use tipb::ScalarFuncSig;
+        use tipb::{Expr, ExprType};
 
         use tikv_util::codec::number::NumberEncoder;
 
@@ -999,7 +1008,7 @@ mod tests {
 
         let node_fn_b = {
             // Col1
-            let mut node_col_1 = Expr::new();
+            let mut node_col_1 = Expr::default();
             node_col_1.set_tp(ExprType::ColumnRef);
             node_col_1
                 .mut_field_type()
@@ -1008,7 +1017,7 @@ mod tests {
             node_col_1.mut_val().encode_i64(1).unwrap();
 
             // fn_c
-            let mut node_fn_c = Expr::new();
+            let mut node_fn_c = Expr::default();
             node_fn_c.set_tp(ExprType::ScalarFunc);
             node_fn_c.set_sig(ScalarFuncSig::CastIntAsString);
             node_fn_c
@@ -1017,7 +1026,7 @@ mod tests {
                 .set_tp(FieldTypeTp::LongLong);
 
             // fn_b
-            let mut node_fn_b = Expr::new();
+            let mut node_fn_b = Expr::default();
             node_fn_b.set_tp(ExprType::ScalarFunc);
             node_fn_b.set_sig(ScalarFuncSig::CastIntAsReal);
             node_fn_b
@@ -1031,7 +1040,7 @@ mod tests {
 
         let node_fn_a = {
             // Const1
-            let mut node_const_1 = Expr::new();
+            let mut node_const_1 = Expr::default();
             node_const_1.set_tp(ExprType::Int64);
             node_const_1
                 .mut_field_type()
@@ -1040,7 +1049,7 @@ mod tests {
             node_const_1.mut_val().encode_i64(7).unwrap();
 
             // Col0
-            let mut node_col_0 = Expr::new();
+            let mut node_col_0 = Expr::default();
             node_col_0.set_tp(ExprType::ColumnRef);
             node_col_0
                 .mut_field_type()
@@ -1049,7 +1058,7 @@ mod tests {
             node_col_0.mut_val().encode_i64(0).unwrap();
 
             // fn_a
-            let mut node_fn_a = Expr::new();
+            let mut node_fn_a = Expr::default();
             node_fn_a.set_tp(ExprType::ScalarFunc);
             node_fn_a.set_sig(ScalarFuncSig::CastIntAsInt);
             node_fn_a
@@ -1063,7 +1072,7 @@ mod tests {
         };
 
         // fn_d
-        let mut node_fn_d = Expr::new();
+        let mut node_fn_d = Expr::default();
         node_fn_d.set_tp(ExprType::ScalarFunc);
         node_fn_d.set_sig(ScalarFuncSig::CastIntAsDecimal);
         node_fn_d
@@ -1104,7 +1113,7 @@ mod tests {
             [Some(574), Some(-13)]
         );
         assert_eq!(val.vector_value().unwrap().logical_rows(), &[0, 1]);
-        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong);
+        assert_eq!(val.field_type().tp(), FieldTypeTp::LongLong as i32);
     }
 
     #[bench]

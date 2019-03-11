@@ -79,7 +79,7 @@ fn test_batch_raft_fallback() {
 
         let addr = format!("localhost:{}", port);
         (0..100).for_each(|_| {
-            raft_client.send(1, &addr, RaftMessage::new()).unwrap();
+            raft_client.send(1, &addr, RaftMessage::default()).unwrap();
             thread::sleep(time::Duration::from_millis(10));
             raft_client.flush();
         });

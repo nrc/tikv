@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use criterion::black_box;
 
-use tipb::executor::Aggregation;
-use tipb::expression::Expr;
+use tipb::Aggregation;
+use tipb::Expr;
 
 use tikv::coprocessor::dag::batch::executors::BatchFastHashAggregationExecutor;
 use tikv::coprocessor::dag::batch::executors::BatchSlowHashAggregationExecutor;

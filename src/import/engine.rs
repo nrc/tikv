@@ -75,7 +75,7 @@ impl Engine {
         let commit_ts = batch.get_commit_ts();
         for m in batch.take_mutations().iter_mut() {
             match m.get_op() {
-                Mutation_OP::Put => {
+                mutation::Op::Put => {
                     let k = Key::from_raw(m.get_key()).append_ts(commit_ts);
                     wb.put(k.as_encoded(), m.get_value()).unwrap();
                 }
@@ -150,7 +150,7 @@ impl fmt::Debug for LazySSTInfo {
 impl LazySSTInfo {
     fn new(env: Arc<Env>, info: ExternalSstFileInfo, cf_name: &'static str) -> Self {
         // This range doesn't contain the data prefix, like the region range.
-        let mut range = Range::new();
+        let mut range = Range::default();
         range.set_start(keys::origin_key(info.smallest_key()).to_owned());
         range.set_end(keys::origin_key(info.largest_key()).to_owned());
 
@@ -186,7 +186,7 @@ impl LazySSTInfo {
             length += size as u64;
         }
 
-        let mut meta = SSTMeta::new();
+        let mut meta = SstMeta::default();
         meta.set_uuid(Uuid::new_v4().as_bytes().to_vec());
         meta.set_range(self.range.clone());
         meta.set_crc32(digest.sum32());
@@ -235,9 +235,9 @@ impl SSTWriter {
         // Creates a writer for default CF
         // Here is where we set table_properties_collector_factory, so that we can collect
         // some properties about SST
-        let mut default_opts = db_cfg.defaultcf.build_opt(&cache);
+        let mut default_opts = db_cfg.new_cf.build_opt(&cache);
         default_opts.set_env(Arc::clone(&env));
-        default_opts.compression_per_level(&db_cfg.defaultcf.compression_per_level);
+        default_opts.compression_per_level(&db_cfg.new_cf.compression_per_level);
         let mut default = SstFileWriter::new(EnvOptions::new(), default_opts);
         default.open(&format!("{}{}.{}:default", path, MAIN_SEPARATOR, uuid))?;
 
@@ -350,12 +350,12 @@ fn tune_dboptions_for_bulk_load(opts: &DbConfig) -> (DBOptions, CFOptions<'_>) {
     block_base_opts.set_cache_index_and_filter_blocks(true);
     let mut cf_opts = ColumnFamilyOptions::new();
     cf_opts.set_block_based_table_factory(&block_base_opts);
-    cf_opts.compression_per_level(&opts.defaultcf.compression_per_level);
+    cf_opts.compression_per_level(&opts.new_cf.compression_per_level);
     // Consider using a large write buffer but be careful about OOM.
-    cf_opts.set_write_buffer_size(opts.defaultcf.write_buffer_size.0);
-    cf_opts.set_target_file_size_base(opts.defaultcf.write_buffer_size.0);
-    cf_opts.set_vector_memtable_factory(opts.defaultcf.write_buffer_size.0);
-    cf_opts.set_max_write_buffer_number(opts.defaultcf.max_write_buffer_number);
+    cf_opts.set_write_buffer_size(opts.new_cf.write_buffer_size.0);
+    cf_opts.set_target_file_size_base(opts.new_cf.write_buffer_size.0);
+    cf_opts.set_vector_memtable_factory(opts.new_cf.write_buffer_size.0);
+    cf_opts.set_max_write_buffer_number(opts.new_cf.max_write_buffer_number);
     // Disable compaction and rate limit.
     cf_opts.set_disable_auto_compactions(true);
     cf_opts.set_soft_pending_compaction_bytes_limit(0);
@@ -396,10 +396,10 @@ mod tests {
     }
 
     fn new_write_batch(n: u8, ts: u64) -> WriteBatch {
-        let mut wb = WriteBatch::new();
+        let mut wb = WriteBatch::default();
         for i in 0..n {
-            let mut m = Mutation::new();
-            m.set_op(Mutation_OP::Put);
+            let mut m = Mutation::default();
+            m.set_op(mutation::Op::Put);
             m.set_key(vec![i]);
             m.set_value(vec![i]);
             wb.mut_mutations().push(m);
@@ -500,12 +500,12 @@ mod tests {
         }
 
         // Make a fake region snapshot.
-        let mut region = Region::new();
+        let mut region = Region::default();
         region.set_id(1);
-        region.mut_peers().push(Peer::new());
+        region.mut_peers().push(Peer::default());
         let snap = RegionSnapshot::from_raw(Arc::clone(&db), region);
 
-        let mut reader = MvccReader::new(snap, None, false, None, None, IsolationLevel::SI);
+        let mut reader = MvccReader::new(snap, None, false, None, None, IsolationLevel::Si);
         // Make sure that all kvs are right.
         for i in 0..n {
             let k = Key::from_raw(&[i]);

@@ -10,8 +10,8 @@ use rand_xorshift::XorShiftRng;
 use cop_datatype::{FieldTypeAccessor, FieldTypeTp};
 use test_coprocessor::*;
 use tikv_util::collections::HashMap;
-use tipb::expression::FieldType;
-use tipb::schema::ColumnInfo;
+use tipb::ColumnInfo;
+use tipb::FieldType;
 
 use tikv::coprocessor::codec::batch::{LazyBatchColumn, LazyBatchColumnVec};
 use tikv::coprocessor::codec::data_type::Decimal;

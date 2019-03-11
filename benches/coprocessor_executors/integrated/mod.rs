@@ -4,7 +4,7 @@ mod fixture;
 mod util;
 
 use cop_datatype::FieldTypeTp;
-use tipb::expression::{ExprType, ScalarFuncSig};
+use tipb::{ExprType, ScalarFuncSig};
 use tipb_helper::ExprDefBuilder;
 
 use crate::util::executor_descriptor::*;

@@ -6,13 +6,12 @@ mod expr_eval;
 #[cfg(test)]
 pub mod test_util;
 
-use tipb::expression::FieldType;
-
 pub use self::expr::{RpnExpression, RpnExpressionNode};
 pub use self::expr_builder::RpnExpressionBuilder;
 pub use self::expr_eval::RpnStackNode;
 
 use crate::coprocessor::codec::data_type::ScalarValue;
+use tipb::FieldType;
 
 /// A structure for holding argument values and type information of arguments and return values.
 ///

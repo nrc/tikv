@@ -3,8 +3,7 @@
 use std::sync::Arc;
 
 use kvproto::coprocessor::KeyRange;
-use tipb::executor::{self, ExecType};
-use tipb::select::DAGRequest;
+use tipb::{self, DagRequest, ExecType};
 
 use crate::storage::Store;
 
@@ -31,7 +30,7 @@ pub struct DAGBuilder;
 impl DAGBuilder {
     /// Given a list of executor descriptors and checks whether all executor descriptors can
     /// be used to build batch executors.
-    pub fn check_build_batch(exec_descriptors: &[executor::Executor]) -> Result<()> {
+    pub fn check_build_batch(exec_descriptors: &[tipb::Executor]) -> Result<()> {
         for ed in exec_descriptors {
             match ed.get_tp() {
                 ExecType::TypeTableScan => {
@@ -89,7 +88,7 @@ impl DAGBuilder {
                 }
                 ExecType::TypeLimit => {}
                 ExecType::TypeTopN => {
-                    let descriptor = ed.get_topN();
+                    let descriptor = ed.get_top_n();
                     BatchTopNExecutor::check_supported(&descriptor).map_err(|e| {
                         Error::Other(box_err!("Unable to use BatchTopNExecutor: {}", e))
                     })?;
@@ -102,7 +101,7 @@ impl DAGBuilder {
 
     // Note: `S` is `'static` because we have trait objects `Executor`.
     pub fn build_batch<S: Store + 'static, C: ExecSummaryCollector + 'static>(
-        executor_descriptors: Vec<executor::Executor>,
+        executor_descriptors: Vec<tipb::Executor>,
         store: S,
         ranges: Vec<KeyRange>,
         config: Arc<EvalConfig>,
@@ -123,7 +122,7 @@ impl DAGBuilder {
                     .inc();
 
                 let mut descriptor = first_ed.take_tbl_scan();
-                let columns_info = descriptor.take_columns().into_vec();
+                let columns_info = descriptor.take_columns();
                 executor = Box::new(
                     BatchTableScanExecutor::new(
                         store,
@@ -141,7 +140,7 @@ impl DAGBuilder {
                     .inc();
 
                 let mut descriptor = first_ed.take_idx_scan();
-                let columns_info = descriptor.take_columns().into_vec();
+                let columns_info = descriptor.take_columns();
                 executor = Box::new(
                     BatchIndexScanExecutor::new(
                         store,
@@ -175,7 +174,7 @@ impl DAGBuilder {
                         BatchSelectionExecutor::new(
                             config.clone(),
                             executor,
-                            ed.take_selection().take_conditions().into_vec(),
+                            ed.take_selection().take_conditions(),
                         )?
                         .with_summary_collector(C::new(summary_slot_index)),
                     )
@@ -191,7 +190,7 @@ impl DAGBuilder {
                         BatchSimpleAggregationExecutor::new(
                             config.clone(),
                             executor,
-                            ed.mut_aggregation().take_agg_func().into_vec(),
+                            ed.mut_aggregation().take_agg_func(),
                         )?
                         .with_summary_collector(C::new(summary_slot_index)),
                     )
@@ -208,8 +207,8 @@ impl DAGBuilder {
                             BatchFastHashAggregationExecutor::new(
                                 config.clone(),
                                 executor,
-                                ed.mut_aggregation().take_group_by().into_vec(),
-                                ed.mut_aggregation().take_agg_func().into_vec(),
+                                ed.mut_aggregation().take_group_by(),
+                                ed.mut_aggregation().take_agg_func(),
                             )?
                             .with_summary_collector(C::new(summary_slot_index)),
                         )
@@ -222,8 +221,8 @@ impl DAGBuilder {
                             BatchSlowHashAggregationExecutor::new(
                                 config.clone(),
                                 executor,
-                                ed.mut_aggregation().take_group_by().into_vec(),
-                                ed.mut_aggregation().take_agg_func().into_vec(),
+                                ed.mut_aggregation().take_group_by(),
+                                ed.mut_aggregation().take_agg_func(),
                             )?
                             .with_summary_collector(C::new(summary_slot_index)),
                         )
@@ -238,8 +237,8 @@ impl DAGBuilder {
                         BatchStreamAggregationExecutor::new(
                             config.clone(),
                             executor,
-                            ed.mut_aggregation().take_group_by().into_vec(),
-                            ed.mut_aggregation().take_agg_func().into_vec(),
+                            ed.mut_aggregation().take_group_by(),
+                            ed.mut_aggregation().take_agg_func(),
                         )?
                         .with_summary_collector(C::new(summary_slot_index)),
                     )
@@ -259,7 +258,7 @@ impl DAGBuilder {
                         .with_label_values(&["batch_top_n"])
                         .inc();
 
-                    let mut d = ed.take_topN();
+                    let mut d = ed.take_top_n();
                     let order_bys = d.get_order_by().len();
                     let mut order_exprs_def = Vec::with_capacity(order_bys);
                     let mut order_is_desc = Vec::with_capacity(order_bys);
@@ -296,7 +295,7 @@ impl DAGBuilder {
     ///
     /// Normal executors iterate rows one by one.
     pub fn build_normal<S: Store + 'static, C: ExecSummaryCollector + 'static>(
-        exec_descriptors: Vec<executor::Executor>,
+        exec_descriptors: Vec<tipb::Executor>,
         store: S,
         ranges: Vec<KeyRange>,
         ctx: Arc<EvalConfig>,
@@ -330,7 +329,7 @@ impl DAGBuilder {
                         .with_summary_collector(C::new(summary_slot_index)),
                 ),
                 ExecType::TypeTopN => Box::new(
-                    TopNExecutor::new(exec.take_topN(), Arc::clone(&ctx), src)?
+                    TopNExecutor::new(exec.take_top_n(), Arc::clone(&ctx), src)?
                         .with_summary_collector(C::new(summary_slot_index)),
                 ),
                 ExecType::TypeLimit => Box::new(
@@ -348,7 +347,7 @@ impl DAGBuilder {
     ///
     /// The inner-most executor must be a table scan executor or an index scan executor.
     fn build_normal_first_executor<S: Store + 'static, C: ExecSummaryCollector + 'static>(
-        mut first: executor::Executor,
+        mut first: tipb::Executor,
         store: S,
         ranges: Vec<KeyRange>,
         collect: bool,
@@ -384,7 +383,7 @@ impl DAGBuilder {
 
     fn build_dag<S: Store + 'static>(
         eval_cfg: EvalConfig,
-        mut req: DAGRequest,
+        mut req: DagRequest,
         ranges: Vec<KeyRange>,
         store: S,
         deadline: Deadline,
@@ -394,7 +393,7 @@ impl DAGBuilder {
 
         let executor = if req.get_collect_execution_summaries() {
             Self::build_normal::<_, ExecSummaryCollectorEnabled>(
-                req.take_executors().into_vec(),
+                req.take_executors(),
                 store,
                 ranges,
                 Arc::new(eval_cfg),
@@ -402,7 +401,7 @@ impl DAGBuilder {
             )?
         } else {
             Self::build_normal::<_, ExecSummaryCollectorDisabled>(
-                req.take_executors().into_vec(),
+                req.take_executors(),
                 store,
                 ranges,
                 Arc::new(eval_cfg),
@@ -422,7 +421,7 @@ impl DAGBuilder {
     fn build_batch_dag<S: Store + 'static>(
         deadline: Deadline,
         config: EvalConfig,
-        mut req: DAGRequest,
+        mut req: DagRequest,
         ranges: Vec<KeyRange>,
         store: S,
     ) -> Result<super::batch_handler::BatchDAGHandler> {
@@ -433,14 +432,14 @@ impl DAGBuilder {
         let config = Arc::new(config);
         let out_most_executor = if collect_exec_summary {
             super::builder::DAGBuilder::build_batch::<_, ExecSummaryCollectorEnabled>(
-                req.take_executors().into_vec(),
+                req.take_executors(),
                 store,
                 ranges,
                 config.clone(),
             )?
         } else {
             super::builder::DAGBuilder::build_batch::<_, ExecSummaryCollectorDisabled>(
-                req.take_executors().into_vec(),
+                req.take_executors(),
                 store,
                 ranges,
                 config.clone(),
@@ -478,7 +477,7 @@ impl DAGBuilder {
     }
 
     pub fn build<S: Store + 'static>(
-        req: DAGRequest,
+        req: DagRequest,
         ranges: Vec<KeyRange>,
         store: S,
         deadline: Deadline,

@@ -319,7 +319,7 @@ mod tests {
 
     use cop_datatype::builder::FieldTypeBuilder;
     use cop_datatype::{FieldTypeFlag, FieldTypeTp};
-    use tipb::expression::ScalarFuncSig;
+    use tipb::ScalarFuncSig;
 
     use crate::coprocessor::dag::rpn_expr::types::test_util::RpnFnScalarEvaluator;
 
