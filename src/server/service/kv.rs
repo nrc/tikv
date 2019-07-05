@@ -882,7 +882,7 @@ impl<T: RaftStoreRouter + 'static, E: Engine> Tikv for Service<T, E> {
         let timer = GRPC_MSG_HISTOGRAM_VEC.read_index.start_coarse_timer();
 
         let region_id = req.get_context().get_region_id();
-        let mut cmd = RaftCmdRequest::default();
+        let mut cmd = Box::new(RaftCmdRequest::default());
         let mut header = RaftRequestHeader::default();
         let mut inner_req = RaftRequest::default();
         inner_req.set_cmd_type(CmdType::ReadIndex);

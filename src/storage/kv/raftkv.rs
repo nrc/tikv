@@ -181,7 +181,7 @@ impl<S: RaftStoreRouter> RaftKv<S> {
     ) -> Result<()> {
         let len = reqs.len();
         let header = self.new_request_header(ctx);
-        let mut cmd = RaftCmdRequest::default();
+        let mut cmd = Box::new(RaftCmdRequest::default());
         cmd.set_header(header);
         cmd.set_requests(reqs);
 
@@ -207,7 +207,7 @@ impl<S: RaftStoreRouter> RaftKv<S> {
         ));
         let len = reqs.len();
         let header = self.new_request_header(ctx);
-        let mut cmd = RaftCmdRequest::default();
+        let mut cmd = Box::new(RaftCmdRequest::default());
         cmd.set_header(header);
         cmd.set_requests(reqs);
 

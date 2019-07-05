@@ -313,9 +313,9 @@ impl<T: PdClient> Runner<T> {
                             );
                             match t {
                                 Task::AskSplit { callback, .. } => {
-                                    callback.invoke_with_response(new_error(box_err!(
+                                    callback.invoke_with_response(Box::new(new_error(box_err!(
                                         "failed to split: Stopped"
-                                    )));
+                                    ))));
                                 }
                                 _ => unreachable!(),
                             }
@@ -807,7 +807,7 @@ fn send_admin_request(
 ) {
     let cmd_type = request.get_cmd_type();
 
-    let mut req = RaftCmdRequest::default();
+    let mut req = Box::new(RaftCmdRequest::default());
     req.mut_header().set_region_id(region_id);
     req.mut_header().set_region_epoch(epoch);
     req.mut_header().set_peer(peer);

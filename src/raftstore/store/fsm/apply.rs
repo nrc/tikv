@@ -232,7 +232,7 @@ impl ExecContext {
 
 struct ApplyCallback {
     region: Region,
-    cbs: Vec<(Option<Callback>, RaftCmdResponse)>,
+    cbs: Vec<(Option<Callback>, Box<RaftCmdResponse>)>,
 }
 
 impl ApplyCallback {
@@ -250,7 +250,7 @@ impl ApplyCallback {
         }
     }
 
-    fn push(&mut self, cb: Option<Callback>, resp: RaftCmdResponse) {
+    fn push(&mut self, cb: Option<Callback>, resp: Box<RaftCmdResponse>) {
         self.cbs.push((cb, resp));
     }
 }
@@ -493,7 +493,7 @@ fn notify_region_removed(region_id: u64, peer_id: u64, mut cmd: PendingCmd) {
 
 pub fn notify_req_region_removed(region_id: u64, cb: Callback) {
     let region_not_found = Error::RegionNotFound(region_id);
-    let resp = cmd_resp::new_error(region_not_found);
+    let resp = Box::new(cmd_resp::new_error(region_not_found));
     cb.invoke_with_response(resp);
 }
 
@@ -510,7 +510,7 @@ fn notify_stale_command(region_id: u64, peer_id: u64, term: u64, mut cmd: Pendin
 }
 
 pub fn notify_stale_req(term: u64, cb: Callback) {
-    let resp = cmd_resp::err_resp(Error::StaleCommand, term);
+    let resp = Box::new(cmd_resp::err_resp(Error::StaleCommand, term));
     cb.invoke_with_response(resp);
 }
 
@@ -788,7 +788,7 @@ impl ApplyDelegate {
         let data = entry.get_data();
 
         if !data.is_empty() {
-            let cmd = util::parse_data_at(data, index, &self.tag);
+            let cmd = Box::new(util::parse_data_at(data, index, &self.tag));
 
             if should_write_to_engine(&cmd, apply_ctx.kv_wb().count()) {
                 apply_ctx.commit(self);
@@ -812,7 +812,7 @@ impl ApplyDelegate {
                 .cbs
                 .last_mut()
                 .unwrap()
-                .push(cmd.cb.take(), cmd_resp::err_resp(Error::StaleCommand, term));
+                .push(cmd.cb.take(), Box::new(cmd_resp::err_resp(Error::StaleCommand, term)));
         }
         ApplyResult::None
     }
@@ -882,7 +882,7 @@ impl ApplyDelegate {
         apply_ctx: &mut ApplyContext,
         index: u64,
         term: u64,
-        cmd: RaftCmdRequest,
+        cmd: Box<RaftCmdRequest>,
     ) -> ApplyResult {
         if index == 0 {
             panic!(
@@ -931,8 +931,8 @@ impl ApplyDelegate {
         ctx: &mut ApplyContext,
         index: u64,
         term: u64,
-        req: RaftCmdRequest,
-    ) -> (RaftCmdResponse, ApplyResult) {
+        req: Box<RaftCmdRequest>,
+    ) -> (Box<RaftCmdResponse>, ApplyResult) {
         // if pending remove, apply should be aborted already.
         assert!(!self.pending_remove);
 
@@ -960,7 +960,7 @@ impl ApplyDelegate {
                         "err" => ?e
                     ),
                 }
-                (cmd_resp::new_error(e), ApplyResult::None)
+                (Box::new(cmd_resp::new_error(e)), ApplyResult::None)
             }
         };
         if let ApplyResult::WaitMergeSource(_) = exec_result {
@@ -1037,8 +1037,8 @@ impl ApplyDelegate {
     fn exec_raft_cmd(
         &mut self,
         ctx: &mut ApplyContext,
-        req: RaftCmdRequest,
-    ) -> Result<(RaftCmdResponse, ApplyResult)> {
+        req: Box<RaftCmdRequest>,
+    ) -> Result<(Box<RaftCmdResponse>, ApplyResult)> {
         // Include region for epoch not match after merge may cause key not in range.
         let include_region =
             req.get_header().get_region_epoch().get_version() >= self.last_merge_version;
@@ -1054,7 +1054,7 @@ impl ApplyDelegate {
         &mut self,
         ctx: &mut ApplyContext,
         req: &RaftCmdRequest,
-    ) -> Result<(RaftCmdResponse, ApplyResult)> {
+    ) -> Result<(Box<RaftCmdResponse>, ApplyResult)> {
         let request = req.get_admin_request();
         let cmd_type = request.get_cmd_type();
         if cmd_type != AdminCmdType::CompactLog && cmd_type != AdminCmdType::CommitMerge {
@@ -1084,7 +1084,7 @@ impl ApplyDelegate {
         }?;
         response.set_cmd_type(cmd_type);
 
-        let mut resp = RaftCmdResponse::default();
+        let mut resp = Box::new(RaftCmdResponse::default());
         if !req.get_header().get_uuid().is_empty() {
             let uuid = req.get_header().get_uuid().to_vec();
             resp.mut_header().set_uuid(uuid);
@@ -1097,7 +1097,7 @@ impl ApplyDelegate {
         &mut self,
         ctx: &ApplyContext,
         req: &RaftCmdRequest,
-    ) -> Result<(RaftCmdResponse, ApplyResult)> {
+    ) -> Result<(Box<RaftCmdResponse>, ApplyResult)> {
         let requests = req.get_requests();
         let mut responses = Vec::with_capacity(requests.len());
 
@@ -1135,7 +1135,7 @@ impl ApplyDelegate {
             responses.push(resp);
         }
 
-        let mut resp = RaftCmdResponse::default();
+        let mut resp = Box::new(RaftCmdResponse::default());
         if !req.get_header().get_uuid().is_empty() {
             let uuid = req.get_header().get_uuid().to_vec();
             resp.mut_header().set_uuid(uuid);

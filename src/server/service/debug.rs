@@ -421,7 +421,7 @@ fn region_detail<T: RaftStoreRouter>(
     header.mut_peer().set_store_id(store_id);
     let mut status_request = StatusRequest::default();
     status_request.set_cmd_type(StatusCmdType::RegionDetail);
-    let mut raft_cmd = RaftCmdRequest::default();
+    let mut raft_cmd = Box::new(RaftCmdRequest::default());
     raft_cmd.set_header(header);
     raft_cmd.set_status_request(status_request);
 
@@ -458,7 +458,7 @@ fn consistency_check<T: RaftStoreRouter>(
     header.set_peer(detail.take_leader());
     let mut admin_request = AdminRequest::default();
     admin_request.set_cmd_type(AdminCmdType::ComputeHash);
-    let mut raft_cmd = RaftCmdRequest::default();
+    let mut raft_cmd = Box::new(RaftCmdRequest::default());
     raft_cmd.set_header(header);
     raft_cmd.set_admin_request(admin_request);
 

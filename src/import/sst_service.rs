@@ -160,7 +160,7 @@ impl<Router: RaftStoreRouter> ImportSst for ImportSSTService<Router> {
         header.set_peer(context.take_peer());
         header.set_region_id(context.get_region_id());
         header.set_region_epoch(context.take_region_epoch());
-        let mut cmd = RaftCmdRequest::default();
+        let mut cmd = Box::new(RaftCmdRequest::default());
         cmd.set_header(header);
         cmd.mut_requests().push(ingest);
 

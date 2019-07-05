@@ -54,7 +54,7 @@ const SHRINK_CACHE_CAPACITY: usize = 64;
 
 struct ReadIndexRequest {
     id: u64,
-    cmds: MustConsumeVec<(RaftCmdRequest, Callback)>,
+    cmds: MustConsumeVec<(Box<RaftCmdRequest>, Callback)>,
     renew_lease_time: Timespec,
     read_index: Option<u64>,
 }
@@ -68,14 +68,14 @@ impl ReadIndexRequest {
         }
     }
 
-    fn push_command(&mut self, req: RaftCmdRequest, cb: Callback) {
+    fn push_command(&mut self, req: Box<RaftCmdRequest>, cb: Callback) {
         RAFT_READ_INDEX_PENDING_COUNT.inc();
         self.cmds.push((req, cb));
     }
 
     fn with_command(
         id: u64,
-        req: RaftCmdRequest,
+        req: Box<RaftCmdRequest>,
         cb: Callback,
         renew_lease_time: Timespec,
     ) -> Self {
@@ -1533,8 +1533,8 @@ impl Peer {
         &mut self,
         ctx: &mut PollContext<T, C>,
         cb: Callback,
-        req: RaftCmdRequest,
-        mut err_resp: RaftCmdResponse,
+        req: Box<RaftCmdRequest>,
+        mut err_resp: Box<RaftCmdResponse>,
     ) -> bool {
         if self.pending_remove {
             return false;
@@ -1775,7 +1775,7 @@ impl Peer {
         last_index <= progress.voters()[&peer_id].matched + ctx.cfg.leader_transfer_max_log_lag
     }
 
-    fn read_local<T, C>(&mut self, ctx: &mut PollContext<T, C>, req: RaftCmdRequest, cb: Callback) {
+    fn read_local<T, C>(&mut self, ctx: &mut PollContext<T, C>, req: Box<RaftCmdRequest>, cb: Callback) {
         ctx.raft_metrics.propose.local_read += 1;
         cb.invoke_read(self.handle_read(ctx, req, false, None))
     }
@@ -1808,8 +1808,8 @@ impl Peer {
     fn read_index<T, C>(
         &mut self,
         poll_ctx: &mut PollContext<T, C>,
-        req: RaftCmdRequest,
-        mut err_resp: RaftCmdResponse,
+        req: Box<RaftCmdRequest>,
+        mut err_resp: Box<RaftCmdResponse>,
         cb: Callback,
     ) -> bool {
         if let Err(e) = self.pre_read_index() {
@@ -1877,7 +1877,7 @@ impl Peer {
         // TimeoutNow has been sent out, so we need to propose explicitly to
         // update leader lease.
         if self.leader_lease.inspect(Some(renew_lease_time)) == LeaseState::Suspect {
-            let req = RaftCmdRequest::default();
+            let req = Box::new(RaftCmdRequest::default());
             if let Ok(index) = self.propose_normal(poll_ctx, req) {
                 let meta = ProposalMeta {
                     index,
@@ -1983,7 +1983,7 @@ impl Peer {
     fn propose_normal<T, C>(
         &mut self,
         poll_ctx: &mut PollContext<T, C>,
-        mut req: RaftCmdRequest,
+        mut req: Box<RaftCmdRequest>,
     ) -> Result<u64> {
         if self.pending_merge_state.is_some()
             && req.get_admin_request().get_cmd_type() != AdminCmdType::RollbackMerge
@@ -2036,7 +2036,7 @@ impl Peer {
     fn propose_transfer_leader<T, C>(
         &mut self,
         ctx: &mut PollContext<T, C>,
-        req: RaftCmdRequest,
+        req: Box<RaftCmdRequest>,
         cb: Callback,
     ) -> bool {
         ctx.raft_metrics.propose.transfer_leader += 1;
@@ -2127,7 +2127,7 @@ impl Peer {
     fn handle_read<T, C>(
         &mut self,
         ctx: &mut PollContext<T, C>,
-        req: RaftCmdRequest,
+        req: Box<RaftCmdRequest>,
         check_epoch: bool,
         read_index: Option<u64>,
     ) -> ReadResponse {
@@ -2478,7 +2478,7 @@ impl ReadExecutor {
                     "err" => ?e,
                 );
                 return ReadResponse {
-                    response: cmd_resp::new_error(e),
+                    response: Box::new(cmd_resp::new_error(e)),
                     snapshot: None,
                 };
             }
@@ -2499,7 +2499,7 @@ impl ReadExecutor {
                             "err" => ?e,
                         );
                         return ReadResponse {
-                            response: cmd_resp::new_error(e),
+                            response: Box::new(cmd_resp::new_error(e)),
                             snapshot: None,
                         };
                     }
@@ -2530,7 +2530,7 @@ impl ReadExecutor {
             responses.push(resp);
         }
 
-        let mut response = RaftCmdResponse::default();
+        let mut response = Box::new(RaftCmdResponse::default());
         response.set_responses(responses);
         let snapshot = if need_snapshot {
             Some(RegionSnapshot::from_snapshot(
@@ -2595,11 +2595,11 @@ fn is_request_urgent(req: &RaftCmdRequest) -> bool {
     }
 }
 
-fn make_transfer_leader_response() -> RaftCmdResponse {
+fn make_transfer_leader_response() -> Box<RaftCmdResponse> {
     let mut response = AdminResponse::default();
     response.set_cmd_type(AdminCmdType::TransferLeader);
     response.set_transfer_leader(TransferLeaderResponse::default());
-    let mut resp = RaftCmdResponse::default();
+    let mut resp = Box::new(RaftCmdResponse::default());
     resp.set_admin_response(response);
     resp
 }
@@ -2618,7 +2618,7 @@ mod tests {
             AdminCmdType::VerifyHash,
         ];
         for tp in AdminCmdType::values() {
-            let mut msg = RaftCmdRequest::default();
+            let mut msg = Box::new(RaftCmdRequest::default());
             msg.mut_admin_request().set_cmd_type(*tp);
             assert_eq!(
                 get_sync_log_from_request(&msg),
@@ -2642,7 +2642,7 @@ mod tests {
             AdminCmdType::RollbackMerge,
         ];
         for tp in AdminCmdType::values() {
-            let mut req = RaftCmdRequest::default();
+            let mut req = Box::new(RaftCmdRequest::default());
             req.mut_admin_request().set_cmd_type(*tp);
             assert_eq!(
                 is_request_urgent(&req),
@@ -2698,7 +2698,7 @@ mod tests {
         let mut table = vec![];
 
         // Ok(_)
-        let mut req = RaftCmdRequest::default();
+        let mut req = Box::new(RaftCmdRequest::default());
         let mut admin_req = raft_cmdpb::AdminRequest::default();
 
         req.set_admin_request(admin_req.clone());

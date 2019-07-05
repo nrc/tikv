@@ -204,7 +204,7 @@ impl<C: ProposalRouter> LocalReader<C> {
             }
         }
 
-        let mut resp = RaftCmdResponse::default();
+        let mut resp = Box::new(RaftCmdResponse::default());
         resp.mut_header().set_error(err);
         let read_resp = ReadResponse {
             response: resp,
@@ -329,7 +329,7 @@ impl<C: ProposalRouter> LocalReader<C> {
                     }
                 }
                 Err(e) => {
-                    let mut response = cmd_resp::new_error(e);
+                    let mut response = Box::new(cmd_resp::new_error(e));
                     if let Some(Some(ref delegate)) = self.delegates.borrow().get(&region_id) {
                         cmd_resp::bind_term(&mut response, delegate.term);
                     }

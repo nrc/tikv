@@ -110,7 +110,7 @@ impl Drop for PeerFsm {
             let mut err = errorpb::Error::default();
             err.set_message("region is not found".to_owned());
             err.mut_region_not_found().set_region_id(self.region_id());
-            let mut resp = RaftCmdResponse::default();
+            let mut resp = Box::new(RaftCmdResponse::default());
             resp.mut_header().set_error(err);
             callback.invoke_with_response(resp);
         }
@@ -2214,7 +2214,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
     fn pre_propose_raft_command(
         &mut self,
         msg: &RaftCmdRequest,
-    ) -> Result<Option<RaftCmdResponse>> {
+    ) -> Result<Option<Box<RaftCmdResponse>>> {
         // Check store_id, make sure that the msg is dispatched to the right place.
         if let Err(e) = util::check_store_id(msg, self.store_id()) {
             self.ctx.raft_metrics.invalid_proposal.mismatch_store_id += 1;
@@ -2270,7 +2270,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
         }
     }
 
-    fn propose_raft_command(&mut self, mut msg: RaftCmdRequest, cb: Callback) {
+    fn propose_raft_command(&mut self, mut msg: Box<RaftCmdRequest>, cb: Callback) {
         match self.pre_propose_raft_command(&msg) {
             Ok(Some(resp)) => {
                 cb.invoke_with_response(resp);
@@ -2284,7 +2284,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
                     "message" => ?msg,
                     "err" => %e,
                 );
-                cb.invoke_with_response(new_error(e));
+                cb.invoke_with_response(Box::new(new_error(e)));
                 return;
             }
             _ => (),
@@ -2303,7 +2303,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
                 "message" => ?msg,
                 "err" => %e,
             );
-            cb.invoke_with_response(new_error(e));
+            cb.invoke_with_response(Box::new(new_error(e)));
             return;
         }
 
@@ -2312,7 +2312,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
         // doesn't matter whether the peer is a leader or not. If it's not a leader, the proposing
         // command log entry can't be committed.
 
-        let mut resp = RaftCmdResponse::default();
+        let mut resp = Box::new(RaftCmdResponse::default());
         let term = self.fsm.peer.term();
         bind_term(&mut resp, term);
         if self.fsm.peer.propose(self.ctx, cb, msg, resp) {
@@ -2514,7 +2514,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
         cb: Callback,
     ) {
         if let Err(e) = self.validate_split_region(&region_epoch, &split_keys) {
-            cb.invoke_with_response(new_error(e));
+            cb.invoke_with_response(Box::new(new_error(e)));
             return;
         }
         let region = self.fsm.peer.region();
@@ -2533,7 +2533,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
             );
             match t {
                 PdTask::AskBatchSplit { callback, .. } => {
-                    callback.invoke_with_response(new_error(box_err!("failed to split: Stopped")));
+                    callback.invoke_with_response(Box::new(new_error(box_err!("failed to split: Stopped"))));
                 }
                 _ => unreachable!(),
             }
@@ -2934,8 +2934,8 @@ pub fn maybe_destroy_source(
     false
 }
 
-pub fn new_admin_request(region_id: u64, peer: metapb::Peer) -> RaftCmdRequest {
-    let mut request = RaftCmdRequest::default();
+pub fn new_admin_request(region_id: u64, peer: metapb::Peer) -> Box<RaftCmdRequest> {
+    let mut request = Box::new(RaftCmdRequest::default());
     request.mut_header().set_region_id(region_id);
     request.mut_header().set_peer(peer);
     request
@@ -2945,7 +2945,7 @@ fn new_verify_hash_request(
     region_id: u64,
     peer: metapb::Peer,
     state: &ConsistencyState,
-) -> RaftCmdRequest {
+) -> Box<RaftCmdRequest> {
     let mut request = new_admin_request(region_id, peer);
 
     let mut admin = AdminRequest::default();
@@ -2961,7 +2961,7 @@ fn new_compact_log_request(
     peer: metapb::Peer,
     compact_index: u64,
     compact_term: u64,
-) -> RaftCmdRequest {
+) -> Box<RaftCmdRequest> {
     let mut request = new_admin_request(region_id, peer);
 
     let mut admin = AdminRequest::default();
@@ -2977,7 +2977,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
     // to another file later.
     // Unlike other commands (write or admin), status commands only show current
     // store status, so no need to handle it in raft group.
-    fn execute_status_command(&mut self, request: &RaftCmdRequest) -> Result<RaftCmdResponse> {
+    fn execute_status_command(&mut self, request: &RaftCmdRequest) -> Result<Box<RaftCmdResponse>> {
         let cmd_type = request.get_status_request().get_cmd_type();
 
         let mut response = match cmd_type {
@@ -2987,7 +2987,7 @@ impl<'a, T: Transport, C: PdClient> PeerFsmDelegate<'a, T, C> {
         }?;
         response.set_cmd_type(cmd_type);
 
-        let mut resp = RaftCmdResponse::default();
+        let mut resp = Box::new(RaftCmdResponse::default());
         resp.set_status_response(response);
         // Bind peer current term here.
         bind_term(&mut resp, self.fsm.peer.term());

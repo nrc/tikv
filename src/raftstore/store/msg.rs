@@ -21,13 +21,13 @@ use super::RegionSnapshot;
 
 #[derive(Debug, Clone)]
 pub struct ReadResponse {
-    pub response: RaftCmdResponse,
+    pub response: Box<RaftCmdResponse>,
     pub snapshot: Option<RegionSnapshot>,
 }
 
 #[derive(Debug)]
 pub struct WriteResponse {
-    pub response: RaftCmdResponse,
+    pub response: Box<RaftCmdResponse>,
 }
 
 pub type ReadCallback = Box<dyn FnOnce(ReadResponse) + Send>;
@@ -48,7 +48,7 @@ pub enum Callback {
 }
 
 impl Callback {
-    pub fn invoke_with_response(self, resp: RaftCmdResponse) {
+    pub fn invoke_with_response(self, resp: Box<RaftCmdResponse>) {
         match self {
             Callback::None => (),
             Callback::Read(read) => {
@@ -259,13 +259,13 @@ impl fmt::Debug for CasualMessage {
 #[derive(Debug)]
 pub struct RaftCommand {
     pub send_time: Instant,
-    pub request: RaftCmdRequest,
+    pub request: Box<RaftCmdRequest>,
     pub callback: Callback,
 }
 
 impl RaftCommand {
     #[inline]
-    pub fn new(request: RaftCmdRequest, callback: Callback) -> RaftCommand {
+    pub fn new(request: Box<RaftCmdRequest>, callback: Callback) -> RaftCommand {
         RaftCommand {
             request,
             callback,

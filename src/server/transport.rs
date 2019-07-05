@@ -27,7 +27,7 @@ pub trait RaftStoreRouter: Send + Clone {
     fn send_raft_msg(&self, msg: RaftMessage) -> RaftStoreResult<()>;
 
     /// Sends RaftCmdRequest to local store.
-    fn send_command(&self, req: RaftCmdRequest, cb: Callback) -> RaftStoreResult<()>;
+    fn send_command(&self, req: Box<RaftCmdRequest>, cb: Callback) -> RaftStoreResult<()>;
 
     /// Sends a significant message. We should guarantee that the message can't be dropped.
     fn significant_send(&self, region_id: u64, msg: SignificantMsg) -> RaftStoreResult<()>;
@@ -75,7 +75,7 @@ impl RaftStoreRouter for RaftStoreBlackHole {
     }
 
     /// Sends RaftCmdRequest to local store.
-    fn send_command(&self, _: RaftCmdRequest, _: Callback) -> RaftStoreResult<()> {
+    fn send_command(&self, _: Box<RaftCmdRequest>, _: Callback) -> RaftStoreResult<()> {
         Ok(())
     }
 
@@ -133,7 +133,7 @@ impl RaftStoreRouter for ServerRaftStoreRouter {
             .map_err(|e| handle_error(region_id, e))
     }
 
-    fn send_command(&self, req: RaftCmdRequest, cb: Callback) -> RaftStoreResult<()> {
+    fn send_command(&self, req: Box<RaftCmdRequest>, cb: Callback) -> RaftStoreResult<()> {
         let cmd = RaftCommand::new(req, cb);
         if LocalReader::<RaftRouter>::acceptable(&cmd.request) {
             self.local_reader.execute_raft_command(cmd);
