@@ -274,7 +274,7 @@ impl Engine for RocksEngine {
             "snapshot failed"
         )));
         let not_leader = {
-            let mut header = kvproto::errorpb::Error::new();
+            let mut header = kvproto::errorpb::Error::default();
             header.mut_not_leader().set_region_id(100);
             header
         };

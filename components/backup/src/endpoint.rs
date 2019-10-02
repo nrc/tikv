@@ -123,7 +123,7 @@ impl BackupRange {
         engine: &E,
         backup_ts: u64,
     ) -> Result<Statistics> {
-        let mut ctx = Context::new();
+        let mut ctx = Context::default();
         ctx.set_region_id(self.region.get_id());
         ctx.set_region_epoch(self.region.get_region_epoch().to_owned());
         ctx.set_peer(self.leader.clone());
@@ -450,7 +450,7 @@ impl<E: Engine, R: RegionInfoProvider> Endpoint<E, R> {
             let end_key = brange
                 .end_key
                 .map_or_else(|| vec![], |k| k.into_raw().unwrap());
-            let mut response = BackupResponse::new();
+            let mut response = BackupResponse::default();
             match res {
                 Ok((mut files, stat)) => {
                     debug!("backup region finish";
@@ -841,7 +841,7 @@ pub mod tests {
         // TODO: check key number for each snapshot.
         let limiter = Arc::new(IOLimiter::new(10 * 1024 * 1024 /* 10 MB/s */));
         for (ts, len) in backup_tss {
-            let mut req = BackupRequest::new();
+            let mut req = BackupRequest::default();
             req.set_start_key(vec![]);
             req.set_end_key(vec![b'5']);
             req.set_start_version(ts);
@@ -907,7 +907,7 @@ pub mod tests {
         );
 
         let now = alloc_ts();
-        let mut req = BackupRequest::new();
+        let mut req = BackupRequest::default();
         req.set_start_key(vec![]);
         req.set_end_key(vec![b'5']);
         req.set_start_version(now);
@@ -984,7 +984,7 @@ pub mod tests {
         must_commit(&engine, key.as_bytes(), start, commit);
 
         let now = alloc_ts();
-        let mut req = BackupRequest::new();
+        let mut req = BackupRequest::default();
         req.set_start_key(vec![]);
         req.set_end_key(vec![]);
         req.set_start_version(now);
@@ -1021,7 +1021,7 @@ pub mod tests {
             .region_info
             .set_regions(vec![(b"".to_vec(), b"5".to_vec(), 1)]);
 
-        let mut req = BackupRequest::new();
+        let mut req = BackupRequest::default();
         req.set_start_key(vec![]);
         req.set_end_key(vec![]);
         req.set_start_version(1);
@@ -1053,7 +1053,7 @@ pub mod tests {
             .region_info
             .set_regions(vec![(b"".to_vec(), b"".to_vec(), 1)]);
 
-        let mut req = BackupRequest::new();
+        let mut req = BackupRequest::default();
         req.set_start_key(vec![]);
         req.set_end_key(vec![]);
         req.set_start_version(1);
@@ -1113,7 +1113,7 @@ pub mod tests {
             tx
         };
 
-        let mut req = BackupRequest::new();
+        let mut req = BackupRequest::default();
         req.set_start_key(vec![]);
         req.set_end_key(vec![]);
         req.set_start_version(1);

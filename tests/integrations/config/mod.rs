@@ -531,7 +531,7 @@ fn test_serde_custom_tikv_config() {
         max_write_bytes_per_sec: ReadableSize::mb(10),
     };
 
-    let custom = read_file_in_project_dir("tests/integrations/config/test-custom.toml");
+    let custom = read_file_in_project_dir("integrations/config/test-custom.toml");
     let load = toml::from_str(&custom).unwrap();
     assert_eq!(value, load);
     let dump = toml::to_string_pretty(&load).unwrap();
@@ -544,7 +544,7 @@ fn test_serde_default_config() {
     let cfg: TiKvConfig = toml::from_str("").unwrap();
     assert_eq!(cfg, TiKvConfig::default());
 
-    let content = read_file_in_project_dir("tests/integrations/config/test-default.toml");
+    let content = read_file_in_project_dir("integrations/config/test-default.toml");
     let cfg: TiKvConfig = toml::from_str(&content).unwrap();
     assert_eq!(cfg, TiKvConfig::default());
 }
@@ -563,7 +563,7 @@ fn test_readpool_default_config() {
 
 #[test]
 fn test_block_cache_backward_compatible() {
-    let content = read_file_in_project_dir("tests/integrations/config/test-cache-compatible.toml");
+    let content = read_file_in_project_dir("integrations/config/test-cache-compatible.toml");
     let mut cfg: TiKvConfig = toml::from_str(&content).unwrap();
     assert!(cfg.storage.block_cache.shared);
     assert!(cfg.storage.block_cache.capacity.is_none());
