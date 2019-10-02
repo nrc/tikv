@@ -279,7 +279,7 @@ mod tests {
     use crate::storage::{CFStatistics, Engine, Key, RocksEngine, TestEngineBuilder};
 
     fn new_multi_point_getter<E: Engine>(engine: &E, ts: u64) -> PointGetter<E::Snap> {
-        let snapshot = engine.snapshot(&Context::new()).unwrap();
+        let snapshot = engine.snapshot(&Context::default()).unwrap();
         PointGetterBuilder::new(snapshot, ts)
             .isolation_level(IsolationLevel::Si)
             .build()
@@ -287,7 +287,7 @@ mod tests {
     }
 
     fn new_single_point_getter<E: Engine>(engine: &E, ts: u64) -> PointGetter<E::Snap> {
-        let snapshot = engine.snapshot(&Context::new()).unwrap();
+        let snapshot = engine.snapshot(&Context::default()).unwrap();
         PointGetterBuilder::new(snapshot, ts)
             .isolation_level(IsolationLevel::Si)
             .multi(false)
@@ -602,7 +602,7 @@ mod tests {
     fn test_omit_value() {
         let engine = new_sample_engine_2();
 
-        let snapshot = engine.snapshot(&Context::new()).unwrap();
+        let snapshot = engine.snapshot(&Context::default()).unwrap();
 
         let mut getter = PointGetterBuilder::new(snapshot.clone(), 4)
             .isolation_level(IsolationLevel::Si)

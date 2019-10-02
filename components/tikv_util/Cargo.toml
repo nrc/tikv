@@ -6,6 +6,8 @@ publish = false
 
 [features]
 failpoints = ["fail/failpoints"]
+prost-codec = ["grpcio/prost-codec", "raft/prost-codec", "prost"]
+protobuf-codec = ["grpcio/protobuf-codec", "raft/protobuf-codec"]
 
 [dependencies]
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_debug"] }
@@ -22,6 +24,7 @@ toml = "0.4"
 libc = "0.2"
 crc = "1.8"
 protobuf = "2"
+prost = { git = "https://github.com/danburkert/prost", rev = "1944c27c3029d01ff216e7b126d846b6cf8c7d77", optional = true }
 utime = "0.2"
 chrono = "0.4"
 lazy_static = "1.3"
@@ -38,11 +41,12 @@ tokio-threadpool = "0.1.13"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
-grpcio = { version = "0.5.0-alpha.3", features = [ "secure" ] }
+grpcio = { version = "0.5.0-alpha.3", features = [ "openssl-vendored" ], default-features = false }
 crossbeam = "0.7.2"
 fail = "0.3"
 fxhash = "0.2.1"
 zeroize = { version = "0.10", features = [ "alloc" ] }
+raft = { version = "0.6.0-alpha", default-features = false }
 
 [dependencies.prometheus]
 git = "https://github.com/pingcap/rust-prometheus.git"
@@ -58,7 +62,6 @@ procinfo = { git = "https://github.com/tikv/procinfo-rs" }
 
 [dev-dependencies]
 panic_hook = { path = "../panic_hook" }
-raft = "0.6.0-alpha"
 
 [[bench]]
 name = "channel"

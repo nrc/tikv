@@ -2802,6 +2802,7 @@ fn make_transfer_leader_response() -> RaftCmdResponse {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "protobuf-codec")]
     use protobuf::ProtobufEnum;
 
     use super::*;

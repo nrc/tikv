@@ -4,6 +4,10 @@ version = "0.0.1"
 edition = "2018"
 publish = false
 
+[features]
+prost-codec = ["tikv_util/prost-codec"]
+protobuf-codec = ["tikv_util/protobuf-codec"]
+
 [dependencies]
 tikv_util = { path = "../tikv_util" }
 tikv_alloc = { path = "../tikv_alloc" }

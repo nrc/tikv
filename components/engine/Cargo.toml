@@ -8,11 +8,14 @@ publish = false
 jemalloc = ["rocksdb/jemalloc"]
 portable = ["rocksdb/portable"]
 sse = ["rocksdb/sse"]
+prost-codec = ["raft/prost-codec", "kvproto/prost-codec", "tikv_util/prost-codec", "prost"]
+protobuf-codec = ["raft/protobuf-codec", "kvproto/protobuf-codec", "tikv_util/protobuf-codec"]
 
 [dependencies]
-kvproto = { git = "https://github.com/pingcap/kvproto.git" }
-protobuf = "2"
-raft = "0.6.0-alpha"
+protobuf = "2.8"
+kvproto = { git = "https://github.com/pingcap/kvproto.git", default-features = false }
+raft = { version = "0.6.0-alpha" , default-features = false }
+prost = { git = "https://github.com/danburkert/prost", rev = "1944c27c3029d01ff216e7b126d846b6cf8c7d77", optional = true }
 quick-error = "1.2.2"
 crc = "1.8"
 lazy_static = "1.3"

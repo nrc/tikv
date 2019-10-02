@@ -7,7 +7,7 @@ use futures::sync::mpsc;
 use futures::{future, stream, Future, Stream};
 
 use kvproto::{coprocessor as coppb, errorpb, kvrpcpb};
-use protobuf::{CodedInputStream, Message};
+use protobuf::Message;
 use tipb::{AnalyzeReq, AnalyzeType};
 use tipb::{ChecksumRequest, ChecksumScanOn};
 use tipb::{DagRequest, ExecType};
@@ -28,9 +28,6 @@ pub struct Endpoint<E: Engine> {
     read_pool_high: FuturePool,
     read_pool_normal: FuturePool,
     read_pool_low: FuturePool,
-
-    /// The recursion limit when parsing Coprocessor Protobuf requests.
-    recursion_limit: u32,
 
     batch_row_limit: usize,
     stream_batch_row_limit: usize,
@@ -66,7 +63,6 @@ impl<E: Engine> Endpoint<E> {
             read_pool_high,
             read_pool_normal,
             read_pool_low,
-            recursion_limit: cfg.end_point_recursion_limit,
             batch_row_limit: cfg.end_point_batch_row_limit,
             enable_batch_if_possible: cfg.end_point_enable_batch_if_possible,
             stream_batch_row_limit: cfg.end_point_stream_batch_row_limit,
@@ -102,16 +98,13 @@ impl<E: Engine> Endpoint<E> {
             req.take_ranges().to_vec(),
         );
 
-        let mut is = CodedInputStream::from_bytes(&data);
-        is.set_recursion_limit(self.recursion_limit);
-
         let req_ctx: ReqContext;
         let builder: RequestHandlerBuilder<E::Snap>;
 
         match req.get_tp() {
             REQ_TYPE_DAG => {
                 let mut dag = DagRequest::default();
-                box_try!(dag.merge_from(&mut is));
+                box_try!(dag.merge_from_bytes(&data));
                 let mut table_scan = false;
                 let mut is_desc_scan = false;
                 if let Some(scan) = dag.get_executors().iter().next() {
@@ -154,7 +147,7 @@ impl<E: Engine> Endpoint<E> {
             }
             REQ_TYPE_ANALYZE => {
                 let mut analyze = AnalyzeReq::default();
-                box_try!(analyze.merge_from(&mut is));
+                box_try!(analyze.merge_from_bytes(&data));
                 let table_scan = analyze.get_tp() == AnalyzeType::TypeColumn;
                 req_ctx = ReqContext::new(
                     make_tag(table_scan),
@@ -173,7 +166,7 @@ impl<E: Engine> Endpoint<E> {
             }
             REQ_TYPE_CHECKSUM => {
                 let mut checksum = ChecksumRequest::default();
-                box_try!(checksum.merge_from(&mut is));
+                box_try!(checksum.merge_from_bytes(&data));
                 let table_scan = checksum.get_scan_on() == ChecksumScanOn::Table;
                 req_ctx = ReqContext::new(
                     make_tag(table_scan),
@@ -674,17 +667,12 @@ mod tests {
     fn test_stack_guard() {
         let engine = TestEngineBuilder::new().build().unwrap();
         let read_pool = build_read_pool_for_test(&CoprReadPoolConfig::default_for_test(), engine);
-        let cop = Endpoint::<RocksEngine>::new(
-            &Config {
-                end_point_recursion_limit: 5,
-                ..Config::default()
-            },
-            read_pool,
-        );
+        let cop = Endpoint::<RocksEngine>::new(&Config::default(), read_pool);
 
         let req = {
             let mut expr = Expr::default();
-            for _ in 0..10 {
+            // The recursion limit in Prost and rust-protobuf (by default) is 100.
+            for _ in 0..101 {
                 let mut e = Expr::default();
                 e.mut_children().push(expr);
                 expr = e;

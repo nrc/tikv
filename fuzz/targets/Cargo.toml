@@ -4,6 +4,10 @@ version = "0.0.1"
 publish = false
 edition = "2018"
 
+[features]
+prost-codec = ["tikv_util/prost-codec", "tidb_query/prost-codec"]
+protobuf-codec = ["tikv_util/protobuf-codec", "tidb_query/protobuf-codec"]
+
 [lib]
 path = "mod.rs"
 

@@ -128,7 +128,7 @@ fn test_stream_batch_row_limit() {
         chunk.merge_from_bytes(resp.get_data()).unwrap();
         assert_eq!(
             resp.get_output_counts(),
-            expected_output_counts[i].as_slice()
+            expected_output_counts[i].as_slice(),
         );
 
         let chunks = vec![chunk];
@@ -1452,7 +1452,7 @@ fn test_output_counts() {
 
     let req = DAGSelect::from(&product).build();
     let resp = handle_select(&endpoint, req);
-    assert_eq!(resp.get_output_counts(), [data.len() as i64]);
+    assert_eq!(resp.get_output_counts(), &[data.len() as i64]);
 }
 
 #[test]

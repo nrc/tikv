@@ -561,11 +561,11 @@ impl<S: StoreAddrResolver + 'static> Detector<S> {
                 DetectType::CleanUpWaitFor => DeadlockRequestType::CleanUpWaitFor,
                 DetectType::CleanUp => DeadlockRequestType::CleanUp,
             };
-            let mut entry = WaitForEntry::new();
+            let mut entry = WaitForEntry::default();
             entry.set_txn(txn_ts);
             entry.set_wait_for_txn(lock.ts);
             entry.set_key_hash(lock.hash);
-            let mut req = DeadlockRequest::new();
+            let mut req = DeadlockRequest::default();
             req.set_tp(tp);
             req.set_entry(entry);
             if leader_client.detect(req).is_ok() {

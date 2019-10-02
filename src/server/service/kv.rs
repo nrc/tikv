@@ -2201,6 +2201,7 @@ fn extract_key_errors(res: storage::Result<Vec<storage::Result<()>>>) -> Vec<Key
     }
 }
 
+#[cfg(feature = "protobuf-codec")]
 mod batch_commands_response {
     pub type Response = kvproto::tikvpb::BatchCommandsResponseResponse;
 
@@ -2209,6 +2210,7 @@ mod batch_commands_response {
     }
 }
 
+#[cfg(feature = "protobuf-codec")]
 mod batch_commands_request {
     pub type Request = kvproto::tikvpb::BatchCommandsRequestRequest;
 
