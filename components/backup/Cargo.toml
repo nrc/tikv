@@ -9,14 +9,14 @@ name = "integrations"
 path = "tests/integrations/mod.rs"
 
 [dependencies]
-futures-util = { version = "0.3", default-features = false, features = ["io", "io-compat"] }
+anyhow = "1.0"
 crc64fast = "0.1"
 engine = { path = "../engine" }
 engine_rocks = { path = "../engine_rocks" }
 engine_traits = { path = "../engine_traits" }
 external_storage = { path = "../external_storage" }
-failure = "0.1"
 futures = "0.1"
+futures-util = { version = "0.3", default-features = false, features = ["io", "io-compat"] }
 grpcio = { version = "0.5.0-alpha.5", features = [ "openssl-vendored" ], default-features = false }
 hex = "0.3"
 keys = { path = "../keys" }
@@ -31,6 +31,7 @@ slog = { version = "2.3", features = ["max_level_trace", "release_max_level_debu
 # better to not use slog-global, but pass in the logger
 slog-global = { version = "0.1", git = "https://github.com/breeswish/slog-global.git", rev = "0e23a5baff302a9d7bccd85f8f31e43339c2f2c1" }
 tempfile = "3.0"
+thiserror = { path = "../../../thiserror"}
 tidb_query = { path = "../tidb_query" }
 tikv = { path = "../../", default-features = false }
 tikv_alloc = { path = "../tikv_alloc" }

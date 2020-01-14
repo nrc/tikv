@@ -79,6 +79,19 @@ macro_rules! box_err {
     });
 }
 
+/// Create a `thiserror::Error`, then convert it into a local error.
+#[macro_export]
+macro_rules! any_err {
+    ($e:expr) => ({
+        use anyhow::{Error, anyhow};
+        let e: Error = anyhow!("[{}:{}]: {}", file!(), line!(),  $e);
+        e.into()
+    });
+    ($f:tt, $($arg:expr),+) => ({
+        any_err!(format!($f, $($arg),+))
+    });
+}
+
 /// Boxes error first, and then does the same thing as `try!`.
 #[macro_export]
 macro_rules! box_try {

@@ -11,7 +11,7 @@ use futures_util::io::AllowStdIo;
 use kvproto::backup::File;
 use tikv::coprocessor::checksum_crc64_xor;
 use tikv::storage::txn::TxnEntry;
-use tikv_util::{self, box_err, file::Sha256Reader, time::Limiter};
+use tikv_util::{self, any_err, file::Sha256Reader, time::Limiter};
 
 use crate::metrics::*;
 use crate::{Error, Result};
@@ -49,7 +49,7 @@ impl Writer {
         if need_checksum {
             let (k, v) = entry
                 .into_kvpair()
-                .map_err(|err| Error::Other(box_err!("Decode error: {:?}", err)))?;
+                .map_err(|err| Error::Other(any_err!("Decode error: {:?}", err)))?;
             self.total_bytes += (k.len() + v.len()) as u64;
             self.checksum = checksum_crc64_xor(self.checksum, self.digest.clone(), &k, &v);
         }
@@ -70,14 +70,14 @@ impl Writer {
         let file_name = format!("{}_{}.sst", name, cf);
 
         let reader = Sha256Reader::new(sst_reader)
-            .map_err(|e| Error::Other(box_err!("Sha256 error: {:?}", e)))?;
+            .map_err(|e| Error::Other(any_err!("Sha256 error: {:?}", e)))?;
         let mut reader = limiter.limit(AllowStdIo::new(reader));
         storage.write(&file_name, &mut reader)?;
         let sha256 = reader
             .into_inner()
             .into_inner()
             .hash()
-            .map_err(|e| Error::Other(box_err!("Sha256 error: {:?}", e)))?;
+            .map_err(|e| Error::Other(any_err!("Sha256 error: {:?}", e)))?;
 
         let mut file = File::default();
         file.set_name(file_name);
@@ -141,7 +141,7 @@ impl BackupWriter {
                     self.write.write(&write.0, &write.1)?;
                 }
                 TxnEntry::Prewrite { .. } => {
-                    return Err(Error::Other("prewrite is not supported".into()));
+                    return Err(any_err!("prewrite is not supported"));
                 }
             }
             if value_in_default {
