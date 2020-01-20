@@ -11,7 +11,7 @@ use kvproto::kvrpcpb::KeyError;
 use thiserror::Error;
 use tikv::storage::kv::{Error as EngineError, ErrorInner as EngineErrorInner};
 use tikv::storage::mvcc::{Error as MvccError, ErrorInner as MvccErrorInner};
-use tikv::storage::txn::{Error as TxnError, ErrorInner as TxnErrorInner};
+use tikv::storage::txn::Error as TxnError;
 
 use crate::metrics::*;
 
@@ -28,12 +28,10 @@ impl Into<ErrorPb> for Error {
                 err.mut_cluster_id_error().set_request(request);
             }
             Error::Engine(EngineError(box EngineErrorInner::Request(e)))
-            | Error::Txn(TxnError(box TxnErrorInner::Engine(EngineError(
+            | Error::Txn(TxnError::Engine(EngineError(box EngineErrorInner::Request(e))))
+            | Error::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::Engine(EngineError(
                 box EngineErrorInner::Request(e),
-            ))))
-            | Error::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-                box MvccErrorInner::Engine(EngineError(box EngineErrorInner::Request(e))),
-            )))) => {
+            ))))) => {
                 if e.has_not_leader() {
                     BACKUP_RANGE_ERROR_VEC
                         .with_label_values(&["not_leader"])
@@ -66,9 +64,7 @@ impl Into<ErrorPb> for Error {
 
                 err.set_region_error(e);
             }
-            Error::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-                box MvccErrorInner::KeyIsLocked(info),
-            )))) => {
+            Error::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked(info)))) => {
                 BACKUP_RANGE_ERROR_VEC
                     .with_label_values(&["key_is_locked"])
                     .inc();
@@ -98,7 +94,7 @@ impl Into<ErrorPb> for Error {
 /// The error type for backup.
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Other error {0}")]
+    #[error(transparent)]
     Other(#[from] AnyError),
     #[error("RocksDB error {0}")]
     Rocks(String),
@@ -109,7 +105,7 @@ pub enum Error {
     #[error("Engine error {0}")]
     EngineTrait(#[from] Box<EngineTraitError>),
     #[error("Transaction error {0}")]
-    Txn(#[from] TxnError),
+    Txn(#[from_unwrap] TxnError),
     #[error("ClusterId error current {}, request {}", 0.0, 0.1)]
     ClusterId(Box<(u64, u64)>),
 }

@@ -11,7 +11,7 @@ use test_storage::*;
 use tikv::server::gc_worker::{AutoGcConfig, GcConfig};
 use tikv::storage::kv::{Engine, Error as KvError, ErrorInner as KvErrorInner};
 use tikv::storage::mvcc::{Error as MvccError, ErrorInner as MvccErrorInner};
-use tikv::storage::txn::{Error as TxnError, ErrorInner as TxnErrorInner};
+use tikv::storage::txn::Error as TxnError;
 use tikv::storage::{Error as StorageError, ErrorInner as StorageErrorInner};
 use tikv_util::collections::HashMap;
 use tikv_util::HandyRwLock;
@@ -102,9 +102,9 @@ fn test_raft_storage_rollback_before_prewrite() {
     assert!(ret.is_err());
     let err = ret.unwrap_err();
     match err {
-        StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::WriteConflict { .. },
-        ))))) => {}
+        )))) => {}
         _ => {
             panic!("expect WriteConflict error, but got {:?}", err);
         }
@@ -141,9 +141,9 @@ fn test_raft_storage_store_not_match() {
     ctx.set_peer(peer);
     assert!(storage.get(ctx.clone(), &key, 20).is_err());
     let res = storage.get(ctx.clone(), &key, 20);
-    if let StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Engine(KvError(
+    if let StorageError(box StorageErrorInner::Txn(TxnError::Engine(KvError(
         box KvErrorInner::Request(ref e),
-    ))))) = *res.as_ref().err().unwrap()
+    )))) = *res.as_ref().err().unwrap()
     {
         assert!(e.has_store_not_match());
     } else {

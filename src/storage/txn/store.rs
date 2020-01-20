@@ -2,7 +2,7 @@
 
 use kvproto::kvrpcpb::IsolationLevel;
 
-use super::{Error, ErrorInner, Result};
+use super::{Error, Result};
 use crate::storage::kv::{Snapshot, Statistics};
 use crate::storage::metrics::*;
 use crate::storage::mvcc::{
@@ -57,13 +57,7 @@ pub trait Scanner: Send {
                     results.push(Ok((k.to_raw()?, v)));
                 }
                 Ok(None) => break,
-                Err(
-                    e
-                    @
-                    Error(box ErrorInner::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked {
-                        ..
-                    }))),
-                ) => {
+                Err(e @ Error::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked { .. }))) => {
                     results.push(Err(e));
                 }
                 Err(e) => return Err(e),
@@ -351,12 +345,12 @@ impl<S: Snapshot> SnapshotStore<S> {
             if let Some(b) = self.snapshot.lower_bound() {
                 if !b.is_empty() && l.as_encoded().as_slice() < b {
                     REQUEST_EXCEED_BOUND.inc();
-                    return Err(Error::from(ErrorInner::InvalidReqRange {
+                    return Err(Error::InvalidReqRange {
                         start: Some(l.as_encoded().clone()),
                         end: upper_bound.as_ref().map(|ref b| b.as_encoded().clone()),
                         lower_bound: Some(b.to_vec()),
                         upper_bound: self.snapshot.upper_bound().map(|b| b.to_vec()),
-                    }));
+                    });
                 }
             }
         }
@@ -364,12 +358,12 @@ impl<S: Snapshot> SnapshotStore<S> {
             if let Some(b) = self.snapshot.upper_bound() {
                 if !b.is_empty() && (u.as_encoded().as_slice() > b || u.as_encoded().is_empty()) {
                     REQUEST_EXCEED_BOUND.inc();
-                    return Err(Error::from(ErrorInner::InvalidReqRange {
+                    return Err(Error::InvalidReqRange {
                         start: lower_bound.as_ref().map(|ref b| b.as_encoded().clone()),
                         end: Some(u.as_encoded().clone()),
                         lower_bound: self.snapshot.lower_bound().map(|b| b.to_vec()),
                         upper_bound: Some(b.to_vec()),
-                    }));
+                    });
                 }
             }
         }
@@ -874,17 +868,17 @@ mod tests {
         data.insert(Key::from_raw(b"bb"), Ok(b"alphaalpha".to_vec()));
         data.insert(
             Key::from_raw(b"bba"),
-            Err(Error::from(ErrorInner::Mvcc(MvccError::from(
-                MvccErrorInner::KeyIsLocked(kvproto::kvrpcpb::LockInfo::default()),
+            Err(Error::Mvcc(MvccError::from(MvccErrorInner::KeyIsLocked(
+                kvproto::kvrpcpb::LockInfo::default(),
             )))),
         );
         data.insert(Key::from_raw(b"z"), Ok(b"beta".to_vec()));
         data.insert(Key::from_raw(b"ca"), Ok(b"hello".to_vec()));
         data.insert(
             Key::from_raw(b"zz"),
-            Err(Error::from(ErrorInner::Mvcc(MvccError::from(
+            Err(Error::Mvcc(MvccError::from(
                 txn_types::Error::BadFormatLock,
-            )))),
+            ))),
         );
 
         FixtureStore::new(data)

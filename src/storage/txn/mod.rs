@@ -14,9 +14,8 @@ use crate::storage::{
     types::{MvccInfo, TxnStatus},
     Error as StorageError, Result as StorageResult,
 };
+use anyhow::Error as AnyError;
 use kvproto::kvrpcpb::LockInfo;
-use std::error;
-use std::fmt;
 use std::io::Error as IoError;
 use txn_types::{Key, TimeStamp};
 
@@ -39,131 +38,72 @@ pub enum ProcessResult {
     Failed { err: StorageError },
 }
 
-quick_error! {
-    #[derive(Debug)]
-    pub enum ErrorInner {
-        Engine(err: crate::storage::kv::Error) {
-            from()
-            cause(err)
-            description(err.description())
-        }
-        Codec(err: tikv_util::codec::Error) {
-            from()
-            cause(err)
-            description(err.description())
-        }
-        ProtoBuf(err: protobuf::error::ProtobufError) {
-            from()
-            cause(err)
-            description(err.description())
-        }
-        Mvcc(err: crate::storage::mvcc::Error) {
-            from()
-            cause(err)
-            description(err.description())
-        }
-        Other(err: Box<dyn error::Error + Sync + Send>) {
-            from()
-            cause(err.as_ref())
-            description(err.description())
-            display("{:?}", err)
-        }
-        Io(err: IoError) {
-            from()
-            cause(err)
-            description(err.description())
-        }
-        InvalidTxnTso {start_ts: TimeStamp, commit_ts: TimeStamp} {
-            description("Invalid transaction tso")
-            display("Invalid transaction tso with start_ts:{},commit_ts:{}",
-                        start_ts,
-                        commit_ts)
-        }
-        InvalidReqRange {start: Option<Vec<u8>>,
-                        end: Option<Vec<u8>>,
-                        lower_bound: Option<Vec<u8>>,
-                        upper_bound: Option<Vec<u8>>} {
-            description("Invalid request range")
-            display("Request range exceeds bound, request range:[{}, end:{}), physical bound:[{}, {})",
-                        start.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
-                        end.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
-                        lower_bound.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
-                        upper_bound.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()))
-        }
-    }
+#[derive(Debug, thiserror::Error)]
+#[unwrap]
+pub enum Error {
+    #[error(transparent)]
+    Engine(#[from] crate::storage::kv::Error),
+
+    #[error(transparent)]
+    Codec(#[from] tikv_util::codec::Error),
+
+    #[error(transparent)]
+    Mvcc(#[from] crate::storage::mvcc::Error),
+
+    #[error(transparent)]
+    ProtoBuf(#[from] Box<protobuf::error::ProtobufError>),
+
+    #[error(transparent)]
+    Io(#[from] IoError),
+
+    #[error("Invalid transaction tso with start_ts: {start_ts}, commit_ts: {commit_ts}")]
+    InvalidTxnTso {
+        start_ts: TimeStamp,
+        commit_ts: TimeStamp,
+    },
+
+    #[error("Request range exceeds bound, request range:[{}, end:{}), physical bound:[{}, {})",
+        start.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
+        end.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
+        lower_bound.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()),
+        upper_bound.as_ref().map(hex::encode_upper).unwrap_or_else(|| "(none)".to_owned()))]
+    InvalidReqRange {
+        start: Option<Vec<u8>>,
+        end: Option<Vec<u8>>,
+        lower_bound: Option<Vec<u8>>,
+        upper_bound: Option<Vec<u8>>,
+    },
+
+    #[error(transparent)]
+    Other(#[from] AnyError),
 }
 
-impl ErrorInner {
-    pub fn maybe_clone(&self) -> Option<ErrorInner> {
-        match *self {
-            ErrorInner::Engine(ref e) => e.maybe_clone().map(ErrorInner::Engine),
-            ErrorInner::Codec(ref e) => e.maybe_clone().map(ErrorInner::Codec),
-            ErrorInner::Mvcc(ref e) => e.maybe_clone().map(ErrorInner::Mvcc),
-            ErrorInner::InvalidTxnTso {
+impl Error {
+    pub fn maybe_clone(&self) -> Option<Error> {
+        match self {
+            Error::Engine(e) => e.maybe_clone().map(Error::Engine),
+            Error::Codec(e) => e.maybe_clone().map(Error::Codec),
+            Error::Mvcc(e) => e.maybe_clone().map(Error::Mvcc),
+            Error::InvalidTxnTso {
                 start_ts,
                 commit_ts,
-            } => Some(ErrorInner::InvalidTxnTso {
-                start_ts,
-                commit_ts,
+            } => Some(Error::InvalidTxnTso {
+                start_ts: *start_ts,
+                commit_ts: *commit_ts,
             }),
-            ErrorInner::InvalidReqRange {
-                ref start,
-                ref end,
-                ref lower_bound,
-                ref upper_bound,
-            } => Some(ErrorInner::InvalidReqRange {
+            Error::InvalidReqRange {
+                start,
+                end,
+                lower_bound,
+                upper_bound,
+            } => Some(Error::InvalidReqRange {
                 start: start.clone(),
                 end: end.clone(),
                 lower_bound: lower_bound.clone(),
                 upper_bound: upper_bound.clone(),
             }),
-            ErrorInner::Other(_) | ErrorInner::ProtoBuf(_) | ErrorInner::Io(_) => None,
+            Error::Other(_) | Error::ProtoBuf(_) | Error::Io(_) => None,
         }
-    }
-}
-
-pub struct Error(pub Box<ErrorInner>);
-
-impl Error {
-    pub fn maybe_clone(&self) -> Option<Error> {
-        self.0.maybe_clone().map(Error::from)
-    }
-}
-
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl std::error::Error for Error {
-    fn description(&self) -> &str {
-        std::error::Error::description(&self.0)
-    }
-
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        std::error::Error::source(&self.0)
-    }
-}
-
-impl From<ErrorInner> for Error {
-    #[inline]
-    fn from(e: ErrorInner) -> Self {
-        Error(Box::new(e))
-    }
-}
-
-impl<T: Into<ErrorInner>> From<T> for Error {
-    #[inline]
-    default fn from(err: T) -> Self {
-        let err = err.into();
-        err.into()
     }
 }
 

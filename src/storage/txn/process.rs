@@ -26,7 +26,7 @@ use crate::storage::txn::{
     },
     sched_pool::*,
     scheduler::Msg,
-    Error, ErrorInner, ProcessResult, Result,
+    Error, ProcessResult, Result,
 };
 use crate::storage::{
     metrics::{self, KV_COMMAND_KEYWRITE_HISTOGRAM_VEC, SCHED_STAGE_COUNTER_VEC},
@@ -461,9 +461,9 @@ fn wake_up_waiters_if_needed<L: LockManager>(
 
 fn extract_lock_from_result(res: &StorageResult<()>) -> Lock {
     match res {
-        Err(StorageError(box StorageErrorInner::Txn(Error(box ErrorInner::Mvcc(MvccError(
+        Err(StorageError(box StorageErrorInner::Txn(Error::Mvcc(MvccError(
             box MvccErrorInner::KeyIsLocked(info),
-        )))))) => Lock {
+        ))))) => Lock {
             ts: info.get_lock_version().into(),
             hash: Key::from_raw(info.get_key()).gen_hash(),
         },
@@ -649,10 +649,10 @@ fn process_write_impl<S: Snapshot, L: LockManager>(
             ..
         }) => {
             if commit_ts <= lock_ts {
-                return Err(Error::from(ErrorInner::InvalidTxnTso {
+                return Err(Error::InvalidTxnTso {
                     start_ts: lock_ts,
                     commit_ts,
-                }));
+                });
             }
             // Pessimistic txn needs key_hashes to wake up waiters
             let key_hashes = gen_key_hashes_if_needed(&lock_mgr, &keys);
@@ -789,10 +789,10 @@ fn process_write_impl<S: Snapshot, L: LockManager>(
                 };
                 if !commit_ts.is_zero() {
                     if current_lock.ts >= commit_ts {
-                        return Err(Error::from(ErrorInner::InvalidTxnTso {
+                        return Err(Error::InvalidTxnTso {
                             start_ts: current_lock.ts,
                             commit_ts,
-                        }));
+                        });
                     }
                     txn.commit(current_key.clone(), commit_ts)?;
                 } else {
@@ -980,8 +980,8 @@ mod tests {
         info.set_key(raw_key);
         info.set_lock_version(ts);
         info.set_lock_ttl(100);
-        let case = StorageError::from(StorageErrorInner::Txn(Error::from(ErrorInner::Mvcc(
-            MvccError::from(MvccErrorInner::KeyIsLocked(info)),
+        let case = StorageError::from(StorageErrorInner::Txn(Error::Mvcc(MvccError::from(
+            MvccErrorInner::KeyIsLocked(info),
         ))));
         let lock = extract_lock_from_result(&Err(case));
         assert_eq!(lock.ts, ts.into());
@@ -1022,7 +1022,7 @@ mod tests {
         .unwrap();
         assert_eq!(2, statistic.write.seek);
         match e {
-            Error(box ErrorInner::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked(_)))) => (),
+            Error::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked(_))) => (),
             _ => panic!("error type not match"),
         }
         commit(
@@ -1044,9 +1044,7 @@ mod tests {
         .err()
         .unwrap();
         match e {
-            Error(box ErrorInner::Mvcc(MvccError(box MvccErrorInner::WriteConflict {
-                ..
-            }))) => (),
+            Error::Mvcc(MvccError(box MvccErrorInner::WriteConflict { .. })) => (),
             _ => panic!("error type not match"),
         }
         let e = prewrite(
@@ -1059,7 +1057,7 @@ mod tests {
         .err()
         .unwrap();
         match e {
-            Error(box ErrorInner::Mvcc(MvccError(box MvccErrorInner::AlreadyExist { .. }))) => (),
+            Error::Mvcc(MvccError(box MvccErrorInner::AlreadyExist { .. })) => (),
             _ => panic!("error type not match"),
         }
 
@@ -1116,8 +1114,8 @@ mod tests {
         if let ProcessResult::MultiRes { results } = ret.pr {
             if !results.is_empty() {
                 let info = LockInfo::default();
-                return Err(Error::from(ErrorInner::Mvcc(MvccError::from(
-                    MvccErrorInner::KeyIsLocked(info),
+                return Err(Error::Mvcc(MvccError::from(MvccErrorInner::KeyIsLocked(
+                    info,
                 ))));
             }
         }

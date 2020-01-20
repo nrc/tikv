@@ -3959,6 +3959,7 @@ dependencies = [
 name = "tikv"
 version = "4.0.0-alpha"
 dependencies = [
+ "anyhow",
  "async-stream",
  "async-trait",
  "backtrace",
@@ -4028,6 +4029,7 @@ dependencies = [
  "tempfile",
  "test_sst_importer",
  "test_util",
+ "thiserror 1.0.9",
  "tidb_query",
  "tikv_alloc",
  "tikv_util",

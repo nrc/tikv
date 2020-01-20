@@ -2,6 +2,7 @@
 
 #![recursion_limit = "200"]
 #![feature(box_patterns)]
+#![feature(specialization)]
 
 #[macro_use]
 extern crate slog_global;

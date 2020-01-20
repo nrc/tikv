@@ -3,7 +3,7 @@
 use crate::storage;
 use crate::storage::kv::{Error as KvError, ErrorInner as KvErrorInner};
 use crate::storage::mvcc::{Error as MvccError, ErrorInner as MvccErrorInner};
-use crate::storage::txn::{Error as TxnError, ErrorInner as TxnErrorInner};
+use crate::storage::txn::Error as TxnError;
 
 #[derive(Fail, Debug)]
 pub enum Error {
@@ -84,8 +84,8 @@ impl From<MvccError> for Error {
 impl From<TxnError> for Error {
     fn from(err: storage::txn::Error) -> Self {
         match err {
-            TxnError(box TxnErrorInner::Mvcc(mvcc_error)) => Error::from(mvcc_error),
-            TxnError(box TxnErrorInner::Engine(engine_error)) => Error::from(engine_error),
+            TxnError::Mvcc(mvcc_error) => Error::from(mvcc_error),
+            TxnError::Engine(engine_error) => Error::from(engine_error),
             e => Error::Other(e.to_string()),
         }
     }

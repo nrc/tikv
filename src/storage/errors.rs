@@ -7,7 +7,7 @@ use std::io::Error as IoError;
 use crate::storage::{
     kv::{self, Error as EngineError, ErrorInner as EngineErrorInner},
     mvcc::{self, Error as MvccError, ErrorInner as MvccErrorInner},
-    txn::{self, Error as TxnError, ErrorInner as TxnErrorInner},
+    txn::{self, Error as TxnError},
     Result,
 };
 use kvproto::{errorpb, kvrpcpb};
@@ -172,11 +172,11 @@ pub fn extract_region_error<T>(res: &Result<T>) -> Option<errorpb::Error> {
     match *res {
         // TODO: use `Error::cause` instead.
         Err(Error(box ErrorInner::Engine(EngineError(box EngineErrorInner::Request(ref e)))))
-        | Err(Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Engine(EngineError(
+        | Err(Error(box ErrorInner::Txn(TxnError::Engine(EngineError(
             box EngineErrorInner::Request(ref e),
-        ))))))
-        | Err(Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-            box MvccErrorInner::Engine(EngineError(box EngineErrorInner::Request(ref e))),
+        )))))
+        | Err(Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::Engine(
+            EngineError(box EngineErrorInner::Request(ref e)),
         )))))) => Some(e.to_owned()),
         Err(Error(box ErrorInner::SchedTooBusy)) => {
             let mut err = errorpb::Error::default();
@@ -205,9 +205,9 @@ pub fn extract_region_error<T>(res: &Result<T>) -> Option<errorpb::Error> {
 
 pub fn extract_committed(err: &Error) -> Option<TimeStamp> {
     match *err {
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-            box MvccErrorInner::Committed { commit_ts },
-        ))))) => Some(commit_ts),
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::Committed {
+            commit_ts,
+        })))) => Some(commit_ts),
         _ => None,
     }
 }
@@ -215,13 +215,13 @@ pub fn extract_committed(err: &Error) -> Option<TimeStamp> {
 pub fn extract_key_error(err: &Error) -> kvrpcpb::KeyError {
     let mut key_error = kvrpcpb::KeyError::default();
     match err {
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-            box MvccErrorInner::KeyIsLocked(info),
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked(
+            info,
         ))))) => {
             key_error.set_locked(info.clone());
         }
         // failed in prewrite or pessimistic lock
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::WriteConflict {
                 start_ts,
                 conflict_start_ts,
@@ -230,7 +230,7 @@ pub fn extract_key_error(err: &Error) -> kvrpcpb::KeyError {
                 primary,
                 ..
             },
-        ))))) => {
+        )))) => {
             let mut write_conflict = kvrpcpb::WriteConflict::default();
             write_conflict.set_start_ts(start_ts.into_inner());
             write_conflict.set_conflict_ts(conflict_start_ts.into_inner());
@@ -241,36 +241,34 @@ pub fn extract_key_error(err: &Error) -> kvrpcpb::KeyError {
             // for compatibility with older versions.
             key_error.set_retryable(format!("{:?}", err));
         }
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::AlreadyExist { key },
-        ))))) => {
+        )))) => {
             let mut exist = kvrpcpb::AlreadyExist::default();
             exist.set_key(key.clone());
             key_error.set_already_exist(exist);
         }
         // failed in commit
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::TxnLockNotFound { .. },
-        ))))) => {
+        )))) => {
             warn!("txn conflicts"; "err" => ?err);
             key_error.set_retryable(format!("{:?}", err));
         }
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::TxnNotFound { start_ts, key },
-        ))))) => {
+        )))) => {
             let mut txn_not_found = kvrpcpb::TxnNotFound::default();
             txn_not_found.set_start_ts(start_ts.into_inner());
             txn_not_found.set_primary_key(key.to_owned());
             key_error.set_txn_not_found(txn_not_found);
         }
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-            box MvccErrorInner::Deadlock {
-                lock_ts,
-                lock_key,
-                deadlock_key_hash,
-                ..
-            },
-        ))))) => {
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::Deadlock {
+            lock_ts,
+            lock_key,
+            deadlock_key_hash,
+            ..
+        })))) => {
             warn!("txn deadlocks"; "err" => ?err);
             let mut deadlock = kvrpcpb::Deadlock::default();
             deadlock.set_lock_ts(lock_ts.into_inner());
@@ -278,14 +276,14 @@ pub fn extract_key_error(err: &Error) -> kvrpcpb::KeyError {
             deadlock.set_deadlock_key_hash(*deadlock_key_hash);
             key_error.set_deadlock(deadlock);
         }
-        Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
+        Error(box ErrorInner::Txn(TxnError::Mvcc(MvccError(
             box MvccErrorInner::CommitTsExpired {
                 start_ts,
                 commit_ts,
                 key,
                 min_commit_ts,
             },
-        ))))) => {
+        )))) => {
             let mut commit_ts_expired = kvrpcpb::CommitTsExpired::default();
             commit_ts_expired.set_start_ts(start_ts.into_inner());
             commit_ts_expired.set_attempted_commit_ts(commit_ts.into_inner());

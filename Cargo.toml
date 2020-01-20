@@ -43,6 +43,7 @@ protobuf-codec = [
 name = "tikv"
 
 [dependencies]
+anyhow = "1.0"
 async-stream = "0.2"
 async-trait = "0.1"
 backtrace = "0.3.9"
@@ -105,6 +106,7 @@ spin = "0.5"
 sst_importer = { path = "components/sst_importer" }
 sysinfo = { git = "https://github.com/tikv/sysinfo.git", branch = "tikv"}
 tempfile = "3.0"
+thiserror = { path = "../thiserror" }
 tidb_query = { path = "components/tidb_query", default-features = false }
 tikv_alloc = { path = "components/tikv_alloc", default-features = false }
 tikv_util = { path = "components/tikv_util" }

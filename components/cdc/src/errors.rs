@@ -6,7 +6,7 @@ use std::{error, result};
 use kvproto::errorpb::Error as ErrorHeader;
 use tikv::storage::kv::{Error as EngineError, ErrorInner as EngineErrorInner};
 use tikv::storage::mvcc::{Error as MvccError, ErrorInner as MvccErrorInner};
-use tikv::storage::txn::{Error as TxnError, ErrorInner as TxnErrorInner};
+use tikv::storage::txn::Error as TxnError;
 use txn_types::Error as TxnTypesError;
 
 /// The error type for cdc.
@@ -56,12 +56,10 @@ impl Error {
     pub fn extract_error_header(self) -> ErrorHeader {
         match self {
             Error::Engine(EngineError(box EngineErrorInner::Request(e)))
-            | Error::Txn(TxnError(box TxnErrorInner::Engine(EngineError(
+            | Error::Txn(TxnError::Engine(EngineError(box EngineErrorInner::Request(e))))
+            | Error::Txn(TxnError::Mvcc(MvccError(box MvccErrorInner::Engine(EngineError(
                 box EngineErrorInner::Request(e),
-            ))))
-            | Error::Txn(TxnError(box TxnErrorInner::Mvcc(MvccError(
-                box MvccErrorInner::Engine(EngineError(box EngineErrorInner::Request(e))),
-            ))))
+            )))))
             | Error::Request(e) => e,
             other => {
                 let mut e = ErrorHeader::default();

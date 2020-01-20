@@ -1163,7 +1163,7 @@ impl<E: Engine> TestStorageBuilder<E> {
 mod tests {
     use super::*;
 
-    use crate::storage::txn::{commands, Error as TxnError, ErrorInner as TxnErrorInner};
+    use crate::storage::txn::{commands, Error as TxnError};
     use futures03::executor::block_on;
     use kvproto::kvrpcpb::{CommandPri, LockInfo};
     use std::{
@@ -1260,9 +1260,9 @@ mod tests {
         rx.recv().unwrap();
         expect_error(
             |e| match e {
-                Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                     box mvcc::ErrorInner::KeyIsLocked { .. },
-                ))))) => (),
+                )))) => (),
                 e => panic!("unexpected error chain: {:?}", e),
             },
             storage
@@ -1312,11 +1312,11 @@ mod tests {
                     1.into(),
                 ),
                 expect_fail_callback(tx, 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::Engine(EngineError(box EngineErrorInner::Request(
                             ..,
                         ))),
-                    ))))) => {}
+                    )))) => {}
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -1324,9 +1324,9 @@ mod tests {
         rx.recv().unwrap();
         expect_error(
             |e| match e {
-                Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                     box mvcc::ErrorInner::Engine(EngineError(box EngineErrorInner::Request(..))),
-                ))))) => (),
+                )))) => (),
                 e => panic!("unexpected error chain: {:?}", e),
             },
             storage
@@ -1335,9 +1335,9 @@ mod tests {
         );
         expect_error(
             |e| match e {
-                Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                     box mvcc::ErrorInner::Engine(EngineError(box EngineErrorInner::Request(..))),
-                ))))) => (),
+                )))) => (),
                 e => panic!("unexpected error chain: {:?}", e),
             },
             storage
@@ -1354,9 +1354,9 @@ mod tests {
         );
         expect_error(
             |e| match e {
-                Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                     box mvcc::ErrorInner::Engine(EngineError(box EngineErrorInner::Request(..))),
-                ))))) => (),
+                )))) => (),
                 e => panic!("unexpected error chain: {:?}", e),
             },
             storage
@@ -1377,11 +1377,11 @@ mod tests {
         for v in x {
             expect_error(
                 |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::Engine(EngineError(box EngineErrorInner::Request(
                             ..,
                         ))),
-                    ))))) => {}
+                    )))) => {}
                     e => panic!("unexpected error chain: {:?}", e),
                 },
                 v,
@@ -1722,9 +1722,9 @@ mod tests {
             .unwrap();
         expect_error(
             |e| match e {
-                Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                     box mvcc::ErrorInner::KeyIsLocked(..),
-                ))))) => (),
+                )))) => (),
                 e => panic!("unexpected error chain: {:?}", e),
             },
             x.remove(0),
@@ -1839,9 +1839,9 @@ mod tests {
                     105.into(),
                 ),
                 expect_fail_callback(tx, 6, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::WriteConflict { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -1953,9 +1953,9 @@ mod tests {
                     Context::default(),
                 ),
                 expect_fail_callback(tx.clone(), 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::KeyIsLocked(info),
-                    ))))) => assert_eq!(info.get_lock_ttl(), 100),
+                    )))) => assert_eq!(info.get_lock_ttl(), 100),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -3582,9 +3582,9 @@ mod tests {
             .sched_txn_command(
                 commands::TxnHeartBeat::new(k.clone(), 10.into(), 100, Context::default()),
                 expect_fail_callback(tx.clone(), 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::TxnLockNotFound { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -3628,9 +3628,9 @@ mod tests {
             .sched_txn_command(
                 commands::TxnHeartBeat::new(k, 11.into(), 150, Context::default()),
                 expect_fail_callback(tx, 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::TxnLockNotFound { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -3663,9 +3663,9 @@ mod tests {
                     Context::default(),
                 ),
                 expect_fail_callback(tx.clone(), 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::TxnNotFound { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -3698,9 +3698,9 @@ mod tests {
                     ts(9, 0),
                 ),
                 expect_fail_callback(tx.clone(), 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::WriteConflict { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )
@@ -3795,9 +3795,9 @@ mod tests {
             .sched_txn_command(
                 commands::Commit::new(vec![k], ts(25, 0), ts(28, 0), Context::default()),
                 expect_fail_callback(tx, 0, |e| match e {
-                    Error(box ErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(mvcc::Error(
+                    Error(box ErrorInner::Txn(TxnError::Mvcc(mvcc::Error(
                         box mvcc::ErrorInner::TxnLockNotFound { .. },
-                    ))))) => (),
+                    )))) => (),
                     e => panic!("unexpected error chain: {:?}", e),
                 }),
             )

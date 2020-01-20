@@ -5,7 +5,7 @@ use super::deadlock::Scheduler as DetectorScheduler;
 use super::metrics::*;
 use crate::storage::lock_manager::{Lock, WaitTimeout};
 use crate::storage::mvcc::{Error as MvccError, ErrorInner as MvccErrorInner, TimeStamp};
-use crate::storage::txn::{Error as TxnError, ErrorInner as TxnErrorInner};
+use crate::storage::txn::Error as TxnError;
 use crate::storage::{
     Error as StorageError, ErrorInner as StorageErrorInner, ProcessResult, StorageCallback,
 };
@@ -253,18 +253,18 @@ impl Waiter {
     fn extract_key_info(&mut self) -> (Vec<u8>, Vec<u8>) {
         match &mut self.pr {
             ProcessResult::MultiRes { results } => match results.pop().expect("mustn't be empty") {
-                Err(StorageError(box StorageErrorInner::Txn(TxnError(
-                    box TxnErrorInner::Mvcc(MvccError(box MvccErrorInner::KeyIsLocked(mut info))),
-                )))) => (info.take_key(), info.take_primary_lock()),
+                Err(StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
+                    box MvccErrorInner::KeyIsLocked(mut info),
+                ))))) => (info.take_key(), info.take_primary_lock()),
                 _ => panic!("unexpected mvcc error"),
             },
             ProcessResult::Failed { err } => match err {
-                StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(
-                    MvccError(box MvccErrorInner::WriteConflict {
+                StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
+                    box MvccErrorInner::WriteConflict {
                         ref mut key,
                         ref mut primary,
                         ..
-                    }),
+                    },
                 )))) => (
                     std::mem::replace(key, Vec::new()),
                     std::mem::replace(primary, Vec::new()),
@@ -762,8 +762,8 @@ pub mod tests {
         lock_info: LockInfo,
     ) {
         match res {
-            Err(StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(
-                MvccError(box MvccErrorInner::KeyIsLocked(res)),
+            Err(StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
+                box MvccErrorInner::KeyIsLocked(res),
             ))))) => assert_eq!(res, lock_info),
             e => panic!("unexpected error: {:?}", e),
         }
@@ -776,14 +776,14 @@ pub mod tests {
         commit_ts: TimeStamp,
     ) {
         match res {
-            Err(StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(
-                MvccError(box MvccErrorInner::WriteConflict {
+            Err(StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
+                box MvccErrorInner::WriteConflict {
                     start_ts,
                     conflict_start_ts,
                     conflict_commit_ts,
                     key,
                     primary,
-                }),
+                },
             ))))) => {
                 assert_eq!(start_ts, waiter_ts);
                 assert_eq!(conflict_start_ts, lock_info.get_lock_version().into());
@@ -802,13 +802,13 @@ pub mod tests {
         deadlock_hash: u64,
     ) {
         match res {
-            Err(StorageError(box StorageErrorInner::Txn(TxnError(box TxnErrorInner::Mvcc(
-                MvccError(box MvccErrorInner::Deadlock {
+            Err(StorageError(box StorageErrorInner::Txn(TxnError::Mvcc(MvccError(
+                box MvccErrorInner::Deadlock {
                     start_ts,
                     lock_ts,
                     lock_key,
                     deadlock_key_hash,
-                }),
+                },
             ))))) => {
                 assert_eq!(start_ts, waiter_ts);
                 assert_eq!(lock_ts, lock_info.get_lock_version().into());
