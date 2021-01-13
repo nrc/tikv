@@ -281,7 +281,7 @@ where
             Self::flush_txn(txn, &self.limiter, &self.engine)?;
         }
 
-        self.stats.add(reader.get_statistics());
+        self.stats.add(&reader.statistics);
         debug!(
             "gc has finished";
             "start_key" => log_wrappers::Value::key(start_key),
