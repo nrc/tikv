@@ -12,7 +12,7 @@ use engine_rocks::RocksEngine;
 use engine_traits::{DeleteStrategy, MiscExt, Range, CF_DEFAULT, CF_LOCK, CF_WRITE};
 use file_system::{IOType, WithIOType};
 use futures::executor::block_on;
-use kvproto::kvrpcpb::{Context, IsolationLevel, LockInfo};
+use kvproto::kvrpcpb::{Context, LockInfo};
 use pd_client::{FeatureGate, PdClient};
 use raftstore::coprocessor::{CoprocessorHost, RegionInfoProvider};
 use raftstore::router::RaftStoreRouter;
@@ -233,7 +233,6 @@ where
             self.engine.snapshot_on_kv_engine(start_key, end_key)?,
             Some(ScanMode::Forward),
             false,
-            IsolationLevel::Si,
         );
 
         let mut next_key = Some(Key::from_encoded_slice(start_key));
@@ -386,7 +385,7 @@ where
             .engine
             .snapshot_on_kv_engine(start_key.as_encoded(), &[])
             .unwrap();
-        let mut reader = MvccReader::new(snap, Some(ScanMode::Forward), false, IsolationLevel::Si);
+        let mut reader = MvccReader::new(snap, Some(ScanMode::Forward), false);
         let (locks, _) = reader.scan_locks(Some(start_key), None, |l| l.ts <= max_ts, limit)?;
 
         let mut lock_infos = Vec::with_capacity(locks.len());
