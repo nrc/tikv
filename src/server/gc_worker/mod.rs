@@ -19,8 +19,6 @@ use txn_types::TimeStamp;
 #[cfg(test)]
 pub use compaction_filter::tests::gc_by_compact;
 
-const GC_MAX_ROW_VERSIONS_THRESHOLD: u64 = 100;
-
 // Returns true if it needs gc.
 // This is for optimization purpose, does not mean to be accurate.
 pub fn check_need_gc(safe_point: TimeStamp, ratio_threshold: f64, props: &MvccProperties) -> bool {
