@@ -1,6 +1,6 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use crate::storage::kv::{Cursor, CursorBuilder, ScanMode, Snapshot, Statistics};
+use crate::storage::kv::{Cursor, CursorBuilder, ScanMode, Snapshot as EngineSnapshot, Statistics};
 use crate::storage::mvcc::{
     default_not_found_error,
     reader::{OverlappedWrite, TxnCommitRecord},
@@ -19,12 +19,12 @@ use txn_types::{Key, Lock, OldValue, TimeStamp, Value, Write, WriteRef, WriteTyp
 /// 'snapshot' means an mvcc snapshot. In the type parameter bound (of `S`), 'snapshot' means a view
 /// of the underlying storage engine at a given point in time. This latter snapshot will include
 /// values for keys at multiple timestamps.
-pub struct SnapshotReader<S: Snapshot> {
+pub struct SnapshotReader<S: EngineSnapshot> {
     pub reader: MvccReader<S>,
     pub start_ts: TimeStamp,
 }
 
-impl<S: Snapshot> SnapshotReader<S> {
+impl<S: EngineSnapshot> SnapshotReader<S> {
     pub fn new(start_ts: TimeStamp, snapshot: S, fill_cache: bool) -> Self {
         SnapshotReader {
             reader: MvccReader::new(snapshot, None, fill_cache),
@@ -76,7 +76,7 @@ impl<S: Snapshot> SnapshotReader<S> {
     }
 }
 
-pub struct MvccReader<S: Snapshot> {
+pub struct MvccReader<S: EngineSnapshot> {
     snapshot: S,
     pub statistics: Statistics,
     // cursors are used for speeding up scans.
@@ -94,7 +94,7 @@ pub struct MvccReader<S: Snapshot> {
     fill_cache: bool,
 }
 
-impl<S: Snapshot> MvccReader<S> {
+impl<S: EngineSnapshot> MvccReader<S> {
     pub fn new(snapshot: S, scan_mode: Option<ScanMode>, fill_cache: bool) -> Self {
         Self {
             snapshot,
